@@ -21,10 +21,10 @@ pub fn app_name() -> &'static str {
     "Spotify Archivist"
 }
 
-const DEFAULT_LOGIN_TIMEOUT_SECS: u64 = 300;
+const DEFAULT_LOGIN_TIMEOUT_SECS: u64 = 120;
 
 const CLIENT_ID_ENV: &str = "SPOTIFY_ARCHIVIST_CLIENT_ID";
-const DEFAULT_PLACEHOLDER_CLIENT_ID: &str = "set-SPOTIFY_ARCHIVIST_CLIENT_ID-env-var";
+const DEFAULT_CLIENT_ID: &str = "REDACTED_CLIENT_ID";
 
 pub struct AppHandle {
     pub state: AppState,
@@ -129,6 +129,12 @@ async fn start_login(
 }
 
 #[tauri::command]
+async fn cancel_login(app: tauri::State<'_, AppHandle>) -> Result<(), handlers::CommandError> {
+    let _ = app.login.lock().expect("login mutex").take();
+    Ok(())
+}
+
+#[tauri::command]
 async fn await_login(
     app: tauri::State<'_, AppHandle>,
 ) -> Result<handlers::Settings, handlers::CommandError> {
@@ -196,7 +202,7 @@ fn resolve_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PathBuf {
 }
 
 fn resolve_client_id() -> String {
-    std::env::var(CLIENT_ID_ENV).unwrap_or_else(|_| DEFAULT_PLACEHOLDER_CLIENT_ID.to_string())
+    std::env::var(CLIENT_ID_ENV).unwrap_or_else(|_| DEFAULT_CLIENT_ID.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -254,6 +260,7 @@ pub fn run() {
             trigger_sync,
             export,
             start_login,
+            cancel_login,
             await_login,
         ])
         .run(tauri::generate_context!())
@@ -275,9 +282,9 @@ mod tests {
     }
 
     #[test]
-    fn placeholder_client_id_used_when_env_unset() {
+    fn default_client_id_used_when_env_unset() {
         std::env::remove_var(CLIENT_ID_ENV);
-        assert_eq!(resolve_client_id(), DEFAULT_PLACEHOLDER_CLIENT_ID);
+        assert_eq!(resolve_client_id(), DEFAULT_CLIENT_ID);
     }
 
     #[test]

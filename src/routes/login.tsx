@@ -24,6 +24,10 @@ function LoginRoute() {
   return (
     <LoginScreen
       onClick={() => login.mutate()}
+      onCancel={() => {
+        ipc.cancel_login().catch(() => undefined);
+        login.reset();
+      }}
       isLoading={login.isPending}
       error={login.error?.message}
     />

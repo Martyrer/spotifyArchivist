@@ -320,7 +320,7 @@ mod tests {
         assert!(started.authorize_url.contains("client_id=CID"));
         assert!(started.authorize_url.contains(&format!("state={}", started.state)));
         assert!(started.authorize_url.contains("code_challenge_method=S256"));
-        assert!(started.redirect_uri.starts_with("http://127.0.0.1:"));
+        assert_eq!(started.redirect_uri, "http://127.0.0.1:4202/callback");
     }
 
     #[tokio::test]

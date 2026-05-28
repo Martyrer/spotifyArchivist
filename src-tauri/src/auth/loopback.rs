@@ -13,6 +13,9 @@ use tokio::sync::oneshot;
 
 use super::error::{AuthError, Result};
 
+pub const FIXED_LOOPBACK_PORT: u16 = 4202;
+pub const FIXED_REDIRECT_URI: &str = "http://127.0.0.1:4202/callback";
+
 pub struct LoopbackListener {
     pub addr: SocketAddr,
     pub redirect_uri: String,
@@ -31,13 +34,21 @@ const FAILURE_HTML: &str = "<!doctype html><html><body style=\"font-family:sans-
 
 impl LoopbackListener {
     pub async fn bind() -> Result<Self> {
-        let listener = TcpListener::bind(("127.0.0.1", 0))
+        Self::bind_on(FIXED_LOOPBACK_PORT, FIXED_REDIRECT_URI.to_string()).await
+    }
+
+    pub async fn bind_on(port: u16, redirect_uri: String) -> Result<Self> {
+        let listener = TcpListener::bind(("127.0.0.1", port))
             .await
             .map_err(|e| AuthError::Keyring(format!("bind: {e}")))?;
         let addr = listener
             .local_addr()
             .map_err(|e| AuthError::Keyring(format!("addr: {e}")))?;
-        let redirect_uri = format!("http://127.0.0.1:{}/callback", addr.port());
+        let redirect_uri = if port == 0 {
+            format!("http://127.0.0.1:{}/callback", addr.port())
+        } else {
+            redirect_uri
+        };
 
         let (tx, rx) = oneshot::channel::<Outcome>();
         let tx_holder = std::sync::Arc::new(tokio::sync::Mutex::new(Some(tx)));
@@ -135,7 +146,7 @@ mod tests {
 
     #[tokio::test]
     async fn captures_code_and_state() {
-        let listener = LoopbackListener::bind().await.unwrap();
+        let listener = LoopbackListener::bind_on(0, String::new()).await.unwrap();
         let url = format!("{}?code=ABC&state=XYZ", listener.redirect_uri);
         tokio::spawn(async move {
             let _ = reqwest::get(url).await;
@@ -152,7 +163,7 @@ mod tests {
 
     #[tokio::test]
     async fn captures_error_param() {
-        let listener = LoopbackListener::bind().await.unwrap();
+        let listener = LoopbackListener::bind_on(0, String::new()).await.unwrap();
         let url = format!("{}?error=access_denied&state=Y", listener.redirect_uri);
         tokio::spawn(async move {
             let _ = reqwest::get(url).await;
@@ -163,7 +174,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_params_yield_error_outcome() {
-        let listener = LoopbackListener::bind().await.unwrap();
+        let listener = LoopbackListener::bind_on(0, String::new()).await.unwrap();
         let url = listener.redirect_uri.clone();
         tokio::spawn(async move {
             let _ = reqwest::get(url).await;
@@ -177,7 +188,7 @@ mod tests {
 
     #[tokio::test]
     async fn timeout_returns_cancelled() {
-        let listener = LoopbackListener::bind().await.unwrap();
+        let listener = LoopbackListener::bind_on(0, String::new()).await.unwrap();
         let err = listener.wait(Duration::from_millis(50)).await.unwrap_err();
         assert!(matches!(err, AuthError::Cancelled));
     }
