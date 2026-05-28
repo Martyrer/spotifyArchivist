@@ -76,7 +76,7 @@ async fn first_sync_writes_all_fetched_tracks() {
     let source = Source {
         id: sid,
         kind: SourceKind::LikedSongs,
-        spotify_id: None,
+        spotify_id: "__self__".into(),
         name: "Liked Songs".into(),
         enabled: true,
     };
@@ -122,7 +122,7 @@ async fn vanished_track_promoted_to_lost_after_two_syncs() {
     let source = Source {
         id: sid,
         kind: SourceKind::LikedSongs,
-        spotify_id: None,
+        spotify_id: "__self__".into(),
         name: "Liked Songs".into(),
         enabled: true,
     };
@@ -182,7 +182,7 @@ async fn tombstone_in_playlist_marks_loss_immediately() {
     let source = Source {
         id: sid,
         kind: SourceKind::Playlist,
-        spotify_id: Some("pl1".into()),
+        spotify_id: "pl1".into(),
         name: "Mix".into(),
         enabled: true,
     };
@@ -207,7 +207,7 @@ async fn disabled_source_is_skipped_without_fetching() {
     let source = Source {
         id: sid,
         kind: SourceKind::LikedSongs,
-        spotify_id: None,
+        spotify_id: "__self__".into(),
         name: "Liked Songs".into(),
         enabled: false,
     };
@@ -226,7 +226,7 @@ async fn playlist_source_without_spotify_id_errors() {
     let source = Source {
         id: 999,
         kind: SourceKind::Playlist,
-        spotify_id: None,
+        spotify_id: "__self__".into(),
         name: "broken".into(),
         enabled: true,
     };
