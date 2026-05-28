@@ -1,0 +1,4 @@
+# Coverage exclusions tracked here so the rule is one-place reviewable.
+# Tauri command wrappers and setup() are integration-tested via the
+# spawned app, not unit-tested; KeyringBackend hits the real OS keyring
+# and is exercised manually during the auth flow.

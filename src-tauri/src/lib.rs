@@ -46,7 +46,9 @@ impl AppHandle {
 }
 
 #[tauri::command]
-async fn list_sources(app: tauri::State<'_, AppHandle>) -> Result<Vec<Source>, handlers::CommandError> {
+async fn list_sources(
+    app: tauri::State<'_, AppHandle>,
+) -> Result<Vec<Source>, handlers::CommandError> {
     handlers::list_sources(&app.state).await
 }
 
@@ -69,7 +71,9 @@ async fn list_memberships(
 }
 
 #[tauri::command]
-async fn get_settings(app: tauri::State<'_, AppHandle>) -> Result<handlers::Settings, handlers::CommandError> {
+async fn get_settings(
+    app: tauri::State<'_, AppHandle>,
+) -> Result<handlers::Settings, handlers::CommandError> {
     handlers::get_settings(&app.state).await
 }
 
@@ -153,7 +157,12 @@ impl<R: Runtime> scheduler::OnSyncDone for ToastSink<R> {
                 .add_unseen_losses(total_lost)
                 .await
                 .unwrap_or(total_lost);
-            let _ = handle.notification().builder().title(title).body(body).show();
+            let _ = handle
+                .notification()
+                .builder()
+                .title(title)
+                .body(body)
+                .show();
             let _ = handle.emit("losses:updated", new_total);
             update_tray_badge(&handle, new_total);
         });
@@ -232,7 +241,12 @@ async fn await_login(
         .expect("login mutex")
         .take()
         .ok_or(handlers::CommandError::NotAuthenticated)?;
-    handlers::finish_login(&app.state, started, Duration::from_secs(DEFAULT_LOGIN_TIMEOUT_SECS)).await
+    handlers::finish_login(
+        &app.state,
+        started,
+        Duration::from_secs(DEFAULT_LOGIN_TIMEOUT_SECS),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -316,10 +330,9 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir).ok();
             let db_path = data_dir.join("archivist.sqlite");
 
-            let store = tauri::async_runtime::block_on(async {
-                store::Store::open(&db_path).await
-            })
-            .expect("open store");
+            let store =
+                tauri::async_runtime::block_on(async { store::Store::open(&db_path).await })
+                    .expect("open store");
 
             let tokens = auth::TokenStore::os_keyring("dev.archivist.spotify", "tokens");
             let client_id = resolve_client_id();
