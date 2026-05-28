@@ -53,20 +53,23 @@ impl SpotifyClient {
         if let Some(t) = guard.as_ref() {
             return Ok(t.clone());
         }
-        let loaded = self
-            .tokens
-            .load()?
-            .ok_or_else(|| SpotifyError::Api {
-                status: 401,
-                body: "no stored token".into(),
-            })?;
+        let loaded = self.tokens.load()?.ok_or_else(|| SpotifyError::Api {
+            status: 401,
+            body: "no stored token".into(),
+        })?;
         *guard = Some(loaded.clone());
         Ok(loaded)
     }
 
     async fn refresh(&self) -> Result<TokenSet> {
         let current = self.current_token().await?;
-        let new = refresh_token(&self.http, &self.token_url, &self.client_id, &current.refresh_token).await?;
+        let new = refresh_token(
+            &self.http,
+            &self.token_url,
+            &self.client_id,
+            &current.refresh_token,
+        )
+        .await?;
         self.tokens.save(&new)?;
         let mut guard = self.cached.lock().await;
         *guard = Some(new.clone());
@@ -92,7 +95,9 @@ impl SpotifyClient {
             }
             if status.as_u16() == 429 {
                 if rate_attempts >= MAX_RATE_LIMIT_RETRIES {
-                    return Err(SpotifyError::RateLimited { tries: rate_attempts });
+                    return Err(SpotifyError::RateLimited {
+                        tries: rate_attempts,
+                    });
                 }
                 rate_attempts += 1;
                 let retry_after = res
@@ -183,7 +188,8 @@ pub fn classify_playlist(item: PlaylistItem) -> Option<FetchedItem> {
         return None;
     }
     Some(classify(
-        item.added_at.unwrap_or_else(|| "1970-01-01T00:00:00Z".into()),
+        item.added_at
+            .unwrap_or_else(|| "1970-01-01T00:00:00Z".into()),
         item.track,
     ))
 }
@@ -231,12 +237,10 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/me"))
             .and(header("authorization", "Bearer AT"))
-            .respond_with(
-                ResponseTemplate::new(200).set_body_json(json!({
-                    "id": "u1",
-                    "display_name": "User One"
-                })),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "u1",
+                "display_name": "User One"
+            })))
             .mount(&server)
             .await;
         let c = client_for(&server, TokenStore::memory());
@@ -434,7 +438,10 @@ mod tests {
             added_at: "2026-01-01T00:00:00Z".into(),
             track: None,
         };
-        assert!(matches!(classify_saved(saved), FetchedItem::Tombstone { .. }));
+        assert!(matches!(
+            classify_saved(saved),
+            FetchedItem::Tombstone { .. }
+        ));
     }
 
     #[test]

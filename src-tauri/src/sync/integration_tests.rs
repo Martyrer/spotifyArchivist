@@ -236,5 +236,8 @@ async fn playlist_source_without_spotify_id_errors() {
         Arc::new(FixedClock::new("2026-01-01T00:00:00Z")),
     );
     let err = syncer.sync_source(&source).await.unwrap_err();
-    assert!(matches!(err, SyncError::UnsupportedSource(SourceKind::Playlist)));
+    assert!(matches!(
+        err,
+        SyncError::UnsupportedSource(SourceKind::Playlist)
+    ));
 }

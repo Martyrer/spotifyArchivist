@@ -119,8 +119,7 @@ pub fn apply_diff(
 }
 
 fn build_track(id: &str, t: &SpotifyTrack, now: &str) -> Track {
-    let artists_json =
-        serde_json::to_string(&t.artists).unwrap_or_else(|_| "[]".to_string());
+    let artists_json = serde_json::to_string(&t.artists).unwrap_or_else(|_| "[]".to_string());
     Track {
         id: id.to_string(),
         uri: t.uri.clone().unwrap_or_default(),
@@ -188,7 +187,12 @@ mod tests {
 
     #[test]
     fn first_sync_with_no_history_inserts_everything() {
-        let res = apply_diff(1, vec![fetched("t1", "One"), fetched("t2", "Two")], &[], "now");
+        let res = apply_diff(
+            1,
+            vec![fetched("t1", "One"), fetched("t2", "Two")],
+            &[],
+            "now",
+        );
         assert_eq!(res.plan.tracks_to_upsert.len(), 2);
         assert_eq!(res.plan.memberships_to_upsert.len(), 2);
         assert!(res.plan.newly_lost.is_empty());

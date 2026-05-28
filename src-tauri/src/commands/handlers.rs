@@ -89,7 +89,10 @@ pub async fn get_settings(state: &AppState) -> Result<Settings> {
 }
 
 pub async fn update_settings(state: &AppState, sync_interval_hours: u32) -> Result<Settings> {
-    state.store.set_sync_interval_hours(sync_interval_hours).await?;
+    state
+        .store
+        .set_sync_interval_hours(sync_interval_hours)
+        .await?;
     get_settings(state).await
 }
 
@@ -138,7 +141,11 @@ pub async fn ensure_liked_songs_source(state: &AppState) -> Result<i64> {
 }
 
 pub async fn trigger_sync(state: &AppState) -> Result<Vec<crate::sync::SyncOutcome>> {
-    let syncer = Syncer::new(state.store.clone(), state.spotify.clone(), state.clock.clone());
+    let syncer = Syncer::new(
+        state.store.clone(),
+        state.spotify.clone(),
+        state.clock.clone(),
+    );
     let sources = state.store.list_sources().await?;
     let mut outcomes = Vec::with_capacity(sources.len());
     for source in sources.into_iter().filter(|s| s.enabled) {
@@ -185,7 +192,10 @@ pub async fn finish_login(
 ) -> Result<Settings> {
     let outcome = started.listener.wait(timeout).await?;
     match outcome {
-        LoopbackOutcome::Code { code, state: returned } => {
+        LoopbackOutcome::Code {
+            code,
+            state: returned,
+        } => {
             if returned != started.state {
                 return Err(CommandError::StateMismatch);
             }
@@ -205,12 +215,12 @@ pub async fn finish_login(
             ensure_liked_songs_source(state).await?;
             get_settings(state).await
         }
-        LoopbackOutcome::Error { error, .. } => Err(CommandError::Auth(
-            crate::auth::AuthError::TokenEndpoint {
+        LoopbackOutcome::Error { error, .. } => {
+            Err(CommandError::Auth(crate::auth::AuthError::TokenEndpoint {
                 status: 0,
                 body: error,
-            },
-        )),
+            }))
+        }
     }
 }
 
@@ -272,7 +282,9 @@ mod tests {
     async fn list_memberships_passes_filter_through() {
         let state = fixture().await;
         let id = ensure_liked_songs_source(&state).await.unwrap();
-        let rows = list_memberships(&state, id, MembershipFilter::All).await.unwrap();
+        let rows = list_memberships(&state, id, MembershipFilter::All)
+            .await
+            .unwrap();
         assert!(rows.is_empty());
     }
 
@@ -318,7 +330,9 @@ mod tests {
         let state = fixture().await;
         let started = begin_login(&state).await.unwrap();
         assert!(started.authorize_url.contains("client_id=CID"));
-        assert!(started.authorize_url.contains(&format!("state={}", started.state)));
+        assert!(started
+            .authorize_url
+            .contains(&format!("state={}", started.state)));
         assert!(started.authorize_url.contains("code_challenge_method=S256"));
         assert_eq!(started.redirect_uri, "http://127.0.0.1:4202/callback");
     }
@@ -360,7 +374,9 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("out.jsonl");
-        let n = export(&state, ExportScope::All, path.clone()).await.unwrap();
+        let n = export(&state, ExportScope::All, path.clone())
+            .await
+            .unwrap();
         assert_eq!(n, 1);
     }
 

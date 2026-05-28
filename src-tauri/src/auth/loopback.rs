@@ -24,8 +24,14 @@ pub struct LoopbackListener {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
-    Code { code: String, state: String },
-    Error { error: String, state: Option<String> },
+    Code {
+        code: String,
+        state: String,
+    },
+    Error {
+        error: String,
+        state: Option<String>,
+    },
 }
 
 const SUCCESS_HTML: &str = "<!doctype html><html><body style=\"font-family:sans-serif;background:#0a0a0a;color:#f5f5f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;\"><div><h1>Login complete</h1><p>You can close this tab and return to Spotify Archivist.</p></div></body></html>";

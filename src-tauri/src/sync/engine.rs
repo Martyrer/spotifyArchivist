@@ -4,9 +4,7 @@ use sqlx::Acquire;
 
 use super::diff::{apply_diff, DiffPlan};
 use super::error::{Result, SyncError};
-use crate::spotify::{
-    classify_playlist, classify_saved, FetchedItem, SpotifyClient,
-};
+use crate::spotify::{classify_playlist, classify_saved, FetchedItem, SpotifyClient};
 use crate::store::{Membership, Source, SourceKind, Store, Track};
 
 pub trait Clock: Send + Sync {
@@ -38,7 +36,11 @@ pub struct Syncer {
 
 impl Syncer {
     pub fn new(store: Store, spotify: Arc<SpotifyClient>, clock: Arc<dyn Clock>) -> Self {
-        Self { store, spotify, clock }
+        Self {
+            store,
+            spotify,
+            clock,
+        }
     }
 
     pub async fn sync_source(&self, source: &Source) -> Result<SyncOutcome> {
@@ -103,10 +105,7 @@ async fn commit_plan(store: &Store, plan: &DiffPlan) -> Result<()> {
         .acquire()
         .await
         .map_err(crate::store::StoreError::from)?;
-    let mut tx = conn
-        .begin()
-        .await
-        .map_err(crate::store::StoreError::from)?;
+    let mut tx = conn.begin().await.map_err(crate::store::StoreError::from)?;
 
     for t in &plan.tracks_to_upsert {
         upsert_track(&mut tx, t).await?;
@@ -118,10 +117,7 @@ async fn commit_plan(store: &Store, plan: &DiffPlan) -> Result<()> {
     Ok(())
 }
 
-async fn upsert_track(
-    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
-    t: &Track,
-) -> Result<()> {
+async fn upsert_track(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, t: &Track) -> Result<()> {
     sqlx::query(
         "INSERT INTO tracks (id, uri, name, artists, album, first_seen_at)
          VALUES (?, ?, ?, ?, ?, ?)

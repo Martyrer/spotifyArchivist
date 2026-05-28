@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 
 use crate::commands::AppState;
-use crate::sync::{Syncer, SyncOutcome};
+use crate::sync::{SyncOutcome, Syncer};
 
 #[derive(Debug)]
 pub enum Tick {
@@ -32,10 +32,7 @@ pub trait OnSyncDone: Send + Sync {
     fn handle(&self, outcomes: Vec<SyncOutcome>);
 }
 
-pub fn spawn(
-    state: Arc<AppState>,
-    on_done: Arc<dyn OnSyncDone>,
-) -> SchedulerHandle {
+pub fn spawn(state: Arc<AppState>, on_done: Arc<dyn OnSyncDone>) -> SchedulerHandle {
     let (tx, mut rx) = mpsc::channel::<Tick>(8);
     let trigger_tx = tx.clone();
     let initial = Arc::new(Notify::new());
@@ -87,7 +84,11 @@ async fn read_interval_secs(state: &AppState) -> u64 {
 }
 
 async fn run_once(state: &AppState, on_done: &dyn OnSyncDone) {
-    let syncer = Syncer::new(state.store.clone(), state.spotify.clone(), state.clock.clone());
+    let syncer = Syncer::new(
+        state.store.clone(),
+        state.spotify.clone(),
+        state.clock.clone(),
+    );
     let sources = match state.store.list_sources().await {
         Ok(v) => v,
         Err(e) => {
@@ -123,12 +124,7 @@ mod tests {
     async fn fixture() -> Arc<AppState> {
         let store = Store::open_in_memory().await.unwrap();
         let tokens = TokenStore::memory();
-        Arc::new(AppState::new(
-            store,
-            tokens,
-            "CID",
-            std::env::temp_dir(),
-        ))
+        Arc::new(AppState::new(store, tokens, "CID", std::env::temp_dir()))
     }
 
     #[tokio::test]

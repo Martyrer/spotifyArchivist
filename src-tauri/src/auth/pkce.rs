@@ -273,7 +273,9 @@ mod tests {
             .await;
         let http = reqwest::Client::new();
         let url = format!("{}/api/token", server.uri());
-        let t = refresh_token(&http, &url, "CID", "OLD_REFRESH").await.unwrap();
+        let t = refresh_token(&http, &url, "CID", "OLD_REFRESH")
+            .await
+            .unwrap();
         assert_eq!(t.access_token, "NEW");
         assert_eq!(t.refresh_token, "OLD_REFRESH");
     }
@@ -293,7 +295,9 @@ mod tests {
             .await;
         let http = reqwest::Client::new();
         let url = format!("{}/api/token", server.uri());
-        let t = refresh_token(&http, &url, "CID", "OLD_REFRESH").await.unwrap();
+        let t = refresh_token(&http, &url, "CID", "OLD_REFRESH")
+            .await
+            .unwrap();
         assert_eq!(t.refresh_token, "NEW_REFRESH");
     }
 
