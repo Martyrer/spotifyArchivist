@@ -1,3 +1,5 @@
+pub mod store;
+
 pub fn app_name() -> &'static str {
     "Spotify Archivist"
 }
