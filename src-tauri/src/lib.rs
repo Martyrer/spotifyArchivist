@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod commands;
 pub mod export;
+pub mod notify;
 pub mod spotify;
 pub mod store;
 pub mod sync;
@@ -11,7 +12,8 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, Runtime};
+use tauri_plugin_notification::NotificationExt;
 
 use commands::handlers;
 use commands::AppState;
@@ -100,8 +102,59 @@ async fn track_playlist(
 #[tauri::command]
 async fn trigger_sync(
     app: tauri::State<'_, AppHandle>,
+    handle: tauri::AppHandle,
 ) -> Result<Vec<sync::SyncOutcome>, handlers::CommandError> {
-    handlers::trigger_sync(&app.state).await
+    let outcomes = handlers::trigger_sync(&app.state).await?;
+    if let Some(summary) = notify::summarize(&outcomes) {
+        let new_total = app
+            .state
+            .store
+            .add_unseen_losses(summary.total_lost as u32)
+            .await
+            .map_err(handlers::CommandError::from)?;
+        let (title, body) = notify::toast_text(&summary);
+        let _ = handle
+            .notification()
+            .builder()
+            .title(title)
+            .body(body)
+            .show();
+        let _ = handle.emit("losses:updated", new_total);
+        update_tray_badge(&handle, new_total);
+    }
+    Ok(outcomes)
+}
+
+fn update_tray_badge<R: Runtime>(handle: &tauri::AppHandle<R>, unseen: u32) {
+    if let Some(tray) = handle.tray_by_id("main") {
+        let _ = tray.set_tooltip(Some(if unseen == 0 {
+            "Spotify Archivist".to_string()
+        } else {
+            format!("Spotify Archivist — {unseen} unseen loss(es)")
+        }));
+    }
+}
+
+#[tauri::command]
+async fn mark_seen(
+    app: tauri::State<'_, AppHandle>,
+    handle: tauri::AppHandle,
+) -> Result<(), handlers::CommandError> {
+    app.state
+        .store
+        .clear_unseen_losses()
+        .await
+        .map_err(handlers::CommandError::from)?;
+    let _ = handle.emit("losses:updated", 0u32);
+    update_tray_badge(&handle, 0);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_unseen_losses(
+    app: tauri::State<'_, AppHandle>,
+) -> Result<u32, handlers::CommandError> {
+    Ok(app.state.store.unseen_losses().await?)
 }
 
 #[tauri::command]
@@ -262,6 +315,8 @@ pub fn run() {
             start_login,
             cancel_login,
             await_login,
+            mark_seen,
+            get_unseen_losses,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

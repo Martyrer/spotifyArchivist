@@ -1,7 +1,7 @@
 import type { MembershipFilter, Row, Source } from "@/lib/ipc/types";
 import { cn } from "@/lib/cn";
 import { Link } from "@tanstack/react-router";
-import { Heart, ListMusic, RefreshCcw } from "lucide-react";
+import { Heart, ListMusic, RefreshCcw, Settings as SettingsIcon } from "lucide-react";
 import { ipc } from "@/lib/ipc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { TrackList } from "./TrackList";
@@ -57,6 +57,15 @@ export function SourceShell({
             );
           })}
         </nav>
+        <div className="border-t border-neutral-800 px-2 py-2">
+          <Link
+            to="/settings"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-neutral-400 hover:bg-neutral-800/50"
+          >
+            <SettingsIcon size={14} />
+            <span>Settings</span>
+          </Link>
+        </div>
       </aside>
 
       <main className="flex h-full flex-col">

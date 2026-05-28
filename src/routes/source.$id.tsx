@@ -1,6 +1,7 @@
 import { createRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { rootRoute } from "./__root";
 import { ipc } from "@/lib/ipc/client";
 import type { MembershipFilter } from "@/lib/ipc/types";
@@ -16,6 +17,22 @@ function SourceRoute() {
   const { id } = sourceRoute.useParams();
   const sourceId = Number(id);
   const [filter, setFilter] = useState<MembershipFilter>("all");
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    ipc.mark_seen().catch(() => undefined);
+  }, [sourceId]);
+
+  useEffect(() => {
+    const unlisten = listen("sync:trigger-from-tray", () => {
+      ipc.trigger_sync().finally(() =>
+        qc.invalidateQueries({ queryKey: ["memberships"] }),
+      );
+    });
+    return () => {
+      void unlisten.then((u) => u());
+    };
+  }, [qc]);
 
   const sources = useQuery({
     queryKey: ["sources"],

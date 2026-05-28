@@ -45,4 +45,5 @@ CREATE TABLE settings (
 
 INSERT INTO settings (key, value) VALUES
     ('sync_interval_hours', '6'),
-    ('consecutive_failures', '0');
+    ('consecutive_failures', '0'),
+    ('unseen_losses_total', '0');
