@@ -3,11 +3,12 @@ import { cn } from "@/lib/cn";
 
 type Props = {
   onClick: () => void;
+  onCancel?: () => void;
   isLoading: boolean;
   error?: string;
 };
 
-export function LoginScreen({ onClick, isLoading, error }: Props) {
+export function LoginScreen({ onClick, onCancel, isLoading, error }: Props) {
   return (
     <main className="flex h-full flex-1 items-center justify-center">
       <div className="flex max-w-sm flex-col items-center gap-6 text-center">
@@ -31,6 +32,15 @@ export function LoginScreen({ onClick, isLoading, error }: Props) {
         >
           {isLoading ? "Waiting for browser…" : "Login with Spotify"}
         </button>
+        {isLoading && onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-xs text-neutral-400 underline-offset-4 hover:text-neutral-200 hover:underline"
+          >
+            Cancel
+          </button>
+        ) : null}
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}
       </div>
     </main>

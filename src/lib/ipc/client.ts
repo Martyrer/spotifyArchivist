@@ -47,5 +47,6 @@ export const ipc = {
   export: (scope: ExportScope, path: string) =>
     invoke<number>("export", { scope, path }),
   start_login: () => call("start_login", StartLoginResponse),
+  cancel_login: () => invoke<void>("cancel_login"),
   await_login: () => call("await_login", Settings),
 };
