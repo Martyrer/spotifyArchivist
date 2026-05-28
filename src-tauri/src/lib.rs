@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod spotify;
 pub mod store;
+pub mod sync;
 
 pub fn app_name() -> &'static str {
     "Spotify Archivist"
