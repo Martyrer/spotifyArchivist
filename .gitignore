@@ -1,0 +1,66 @@
+# Bun / Node
+node_modules/
+.pnp
+.pnp.*
+.yarn/cache
+.yarn/install-state.gz
+.yarn/build-state.yml
+.yarn/unplugged
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vite/
+dist/
+dist-ssr/
+.turbo/
+.cache/
+
+# Bun
+bun-debug.log*
+
+# Rust / Cargo
+target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/Cargo.lock
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# tsc build artefacts (we use noEmit; these come from project references)
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+app-icon.png
+
+# Test / coverage
+coverage/
+.nyc_output/
+*.lcov
+playwright-report/
+test-results/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# App data
+*.db
+*.sqlite
+*.sqlite-journal
