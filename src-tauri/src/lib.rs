@@ -9,6 +9,10 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Emitter, Manager};
+
 use commands::handlers;
 use commands::AppState;
 use store::{MembershipFilter, Row, Source};
@@ -19,8 +23,9 @@ pub fn app_name() -> &'static str {
 
 const DEFAULT_LOGIN_TIMEOUT_SECS: u64 = 300;
 
-/// Tauri-managed wrapper that holds the shared AppState plus the in-flight
-/// login state, if any.
+const CLIENT_ID_ENV: &str = "SPOTIFY_ARCHIVIST_CLIENT_ID";
+const DEFAULT_PLACEHOLDER_CLIENT_ID: &str = "set-SPOTIFY_ARCHIVIST_CLIENT_ID-env-var";
+
 pub struct AppHandle {
     pub state: AppState,
     pub login: Mutex<Option<handlers::StartedLogin>>,
@@ -141,13 +146,101 @@ fn ping() -> &'static str {
     "pong"
 }
 
+fn build_tray<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> tauri::Result<tauri::tray::TrayIcon<R>> {
+    let open_item = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
+    let sync_item = MenuItem::with_id(app, "sync_now", "Sync now", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open_item, &sync_item, &quit_item])?;
+
+    TrayIconBuilder::with_id("main")
+        .menu(&menu)
+        .icon(app.default_window_icon().cloned().unwrap())
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+            "sync_now" => {
+                let _ = app.emit("sync:trigger-from-tray", ());
+            }
+            "quit" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                if let Some(w) = tray.app_handle().get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+        })
+        .build(app)
+}
+
+fn resolve_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::env::temp_dir())
+}
+
+fn resolve_client_id() -> String {
+    std::env::var(CLIENT_ID_ENV).unwrap_or_else(|_| DEFAULT_PLACEHOLDER_CLIENT_ID.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .setup(|app| {
+            let data_dir = resolve_data_dir(app.handle());
+            std::fs::create_dir_all(&data_dir).ok();
+            let db_path = data_dir.join("archivist.sqlite");
+
+            let store = tauri::async_runtime::block_on(async {
+                store::Store::open(&db_path).await
+            })
+            .expect("open store");
+
+            let tokens = auth::TokenStore::os_keyring("dev.archivist.spotify", "tokens");
+            let client_id = resolve_client_id();
+            let state = AppState::new(store, tokens, client_id, data_dir);
+            app.manage(AppHandle::new(state));
+
+            let _tray = build_tray(app.handle())?;
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             ping,
             list_sources,
@@ -179,5 +272,18 @@ mod tests {
     #[test]
     fn ping_returns_pong() {
         assert_eq!(ping(), "pong");
+    }
+
+    #[test]
+    fn placeholder_client_id_used_when_env_unset() {
+        std::env::remove_var(CLIENT_ID_ENV);
+        assert_eq!(resolve_client_id(), DEFAULT_PLACEHOLDER_CLIENT_ID);
+    }
+
+    #[test]
+    fn env_var_overrides_client_id() {
+        std::env::set_var(CLIENT_ID_ENV, "abc123");
+        assert_eq!(resolve_client_id(), "abc123");
+        std::env::remove_var(CLIENT_ID_ENV);
     }
 }

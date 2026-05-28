@@ -1,12 +1,14 @@
-import { appName } from "@/lib/branding";
+import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree";
+
+const router = createRouter({ routeTree });
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
 
 export default function App() {
-  return (
-    <main className="flex h-full w-full items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{appName}</h1>
-        <p className="text-sm text-neutral-400">Pre-implementation shell.</p>
-      </div>
-    </main>
-  );
+  return <RouterProvider router={router} />;
 }
