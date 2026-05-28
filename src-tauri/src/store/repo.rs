@@ -199,4 +199,24 @@ impl Store {
         self.put_setting("sync_interval_hours", &h.to_string())
             .await
     }
+
+    pub async fn unseen_losses(&self) -> Result<u32> {
+        let v = self
+            .get_setting("unseen_losses_total")
+            .await?
+            .unwrap_or_else(|| "0".to_string());
+        Ok(v.parse().unwrap_or(0))
+    }
+
+    pub async fn add_unseen_losses(&self, n: u32) -> Result<u32> {
+        let cur = self.unseen_losses().await?;
+        let next = cur + n;
+        self.put_setting("unseen_losses_total", &next.to_string())
+            .await?;
+        Ok(next)
+    }
+
+    pub async fn clear_unseen_losses(&self) -> Result<()> {
+        self.put_setting("unseen_losses_total", "0").await
+    }
 }

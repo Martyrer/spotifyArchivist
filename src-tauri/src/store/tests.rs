@@ -175,6 +175,18 @@ async fn settings_invalid_value_errors() {
 }
 
 #[tokio::test]
+async fn unseen_losses_round_trip() {
+    let s = Store::open_in_memory().await.unwrap();
+    assert_eq!(s.unseen_losses().await.unwrap(), 0);
+    let after = s.add_unseen_losses(3).await.unwrap();
+    assert_eq!(after, 3);
+    let after = s.add_unseen_losses(2).await.unwrap();
+    assert_eq!(after, 5);
+    s.clear_unseen_losses().await.unwrap();
+    assert_eq!(s.unseen_losses().await.unwrap(), 0);
+}
+
+#[tokio::test]
 async fn get_setting_returns_none_for_missing() {
     let s = Store::open_in_memory().await.unwrap();
     assert!(s.get_setting("does-not-exist").await.unwrap().is_none());

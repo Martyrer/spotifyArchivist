@@ -49,4 +49,6 @@ export const ipc = {
   start_login: () => call("start_login", StartLoginResponse),
   cancel_login: () => invoke<void>("cancel_login"),
   await_login: () => call("await_login", Settings),
+  mark_seen: () => invoke<void>("mark_seen"),
+  get_unseen_losses: () => invoke<number>("get_unseen_losses"),
 };
