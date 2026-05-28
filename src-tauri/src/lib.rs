@@ -2,6 +2,7 @@ pub mod auth;
 pub mod commands;
 pub mod export;
 pub mod notify;
+pub mod scheduler;
 pub mod spotify;
 pub mod store;
 pub mod sync;
@@ -12,7 +13,7 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Manager, Runtime};
+use tauri::{Emitter, Listener, Manager, Runtime};
 use tauri_plugin_notification::NotificationExt;
 
 use commands::handlers;
@@ -29,15 +30,17 @@ const CLIENT_ID_ENV: &str = "SPOTIFY_ARCHIVIST_CLIENT_ID";
 const DEFAULT_CLIENT_ID: &str = "REDACTED_CLIENT_ID";
 
 pub struct AppHandle {
-    pub state: AppState,
+    pub state: std::sync::Arc<AppState>,
     pub login: Mutex<Option<handlers::StartedLogin>>,
+    pub scheduler_tx: Mutex<Option<tokio::sync::mpsc::Sender<scheduler::Tick>>>,
 }
 
 impl AppHandle {
     pub fn new(state: AppState) -> Self {
         Self {
-            state,
+            state: std::sync::Arc::new(state),
             login: Mutex::new(None),
+            scheduler_tx: Mutex::new(None),
         }
     }
 }
@@ -75,7 +78,12 @@ async fn update_settings(
     app: tauri::State<'_, AppHandle>,
     sync_interval_hours: u32,
 ) -> Result<handlers::Settings, handlers::CommandError> {
-    handlers::update_settings(&app.state, sync_interval_hours).await
+    let result = handlers::update_settings(&app.state, sync_interval_hours).await?;
+    let tx = app.scheduler_tx.lock().expect("scheduler mutex").clone();
+    if let Some(tx) = tx {
+        let _ = tx.send(scheduler::Tick::Reschedule).await;
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -123,6 +131,33 @@ async fn trigger_sync(
         update_tray_badge(&handle, new_total);
     }
     Ok(outcomes)
+}
+
+struct ToastSink<R: Runtime> {
+    handle: tauri::AppHandle<R>,
+    state: std::sync::Arc<AppState>,
+}
+
+impl<R: Runtime> scheduler::OnSyncDone for ToastSink<R> {
+    fn handle(&self, outcomes: Vec<sync::SyncOutcome>) {
+        let summary = match notify::summarize(&outcomes) {
+            Some(s) => s,
+            None => return,
+        };
+        let store = self.state.store.clone();
+        let handle = self.handle.clone();
+        let total_lost = summary.total_lost as u32;
+        let (title, body) = notify::toast_text(&summary);
+        tauri::async_runtime::spawn(async move {
+            let new_total = store
+                .add_unseen_losses(total_lost)
+                .await
+                .unwrap_or(total_lost);
+            let _ = handle.notification().builder().title(title).body(body).show();
+            let _ = handle.emit("losses:updated", new_total);
+            update_tray_badge(&handle, new_total);
+        });
+    }
 }
 
 fn update_tray_badge<R: Runtime>(handle: &tauri::AppHandle<R>, unseen: u32) {
@@ -289,9 +324,32 @@ pub fn run() {
             let tokens = auth::TokenStore::os_keyring("dev.archivist.spotify", "tokens");
             let client_id = resolve_client_id();
             let state = AppState::new(store, tokens, client_id, data_dir);
-            app.manage(AppHandle::new(state));
+            let app_handle = AppHandle::new(state);
+
+            let sink = std::sync::Arc::new(ToastSink {
+                handle: app.handle().clone(),
+                state: app_handle.state.clone(),
+            });
+            let sched = scheduler::spawn(app_handle.state.clone(), sink);
+            *app_handle.scheduler_tx.lock().unwrap() = Some(sched.tx.clone());
+            std::mem::forget(sched);
+
+            app.manage(app_handle);
 
             let _tray = build_tray(app.handle())?;
+
+            let trigger_handle = app.handle().clone();
+            app.handle().listen("sync:trigger-from-tray", move |_| {
+                let h = trigger_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let tx = h
+                        .try_state::<AppHandle>()
+                        .and_then(|s| s.scheduler_tx.lock().ok().and_then(|g| g.clone()));
+                    if let Some(tx) = tx {
+                        let _ = tx.send(scheduler::Tick::Trigger).await;
+                    }
+                });
+            });
             Ok(())
         })
         .on_window_event(|window, event| {
