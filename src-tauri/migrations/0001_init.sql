@@ -1,7 +1,7 @@
 CREATE TABLE sources (
     id INTEGER PRIMARY KEY,
     kind TEXT NOT NULL CHECK (kind IN ('liked_songs','playlist')),
-    spotify_id TEXT,
+    spotify_id TEXT NOT NULL,
     name TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1,
     UNIQUE (kind, spotify_id)

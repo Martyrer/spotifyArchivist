@@ -52,6 +52,7 @@ impl Store {
             SourceKind::LikedSongs => "liked_songs",
             SourceKind::Playlist => "playlist",
         };
+        let sid = spotify_id.unwrap_or("__self__");
         let row: (i64,) = sqlx::query_as(
             r#"
             INSERT INTO sources (kind, spotify_id, name, enabled)
@@ -61,7 +62,7 @@ impl Store {
             "#,
         )
         .bind(kind_str)
-        .bind(spotify_id)
+        .bind(sid)
         .bind(name)
         .fetch_one(&self.pool)
         .await?;

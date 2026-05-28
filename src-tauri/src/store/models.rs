@@ -12,7 +12,7 @@ pub enum SourceKind {
 pub struct Source {
     pub id: i64,
     pub kind: SourceKind,
-    pub spotify_id: Option<String>,
+    pub spotify_id: String,
     pub name: String,
     pub enabled: bool,
 }

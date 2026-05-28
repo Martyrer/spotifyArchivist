@@ -21,7 +21,7 @@ impl Clock for SystemClock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SyncOutcome {
     pub source_id: i64,
     pub newly_lost: Vec<String>,
@@ -75,11 +75,10 @@ impl Syncer {
                 Ok(saved.into_iter().map(classify_saved).collect())
             }
             SourceKind::Playlist => {
-                let id = source
-                    .spotify_id
-                    .as_deref()
-                    .ok_or(SyncError::UnsupportedSource(source.kind))?;
-                let items = self.spotify.playlist_items(id).await?;
+                if source.spotify_id.is_empty() || source.spotify_id == "__self__" {
+                    return Err(SyncError::UnsupportedSource(source.kind));
+                }
+                let items = self.spotify.playlist_items(&source.spotify_id).await?;
                 Ok(items.into_iter().filter_map(classify_playlist).collect())
             }
         }
