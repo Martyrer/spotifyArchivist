@@ -1,3 +1,5 @@
+pub mod auth;
+pub mod spotify;
 pub mod store;
 
 pub fn app_name() -> &'static str {
