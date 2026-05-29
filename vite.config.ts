@@ -41,6 +41,7 @@ export default defineConfig(async () => ({
         "src/components/TrackArt.tsx",
         "src/components/ThemeSync.tsx",
         "src/components/ThemeToggle.tsx",
+        "src/components/DotField.tsx",
       ],
       thresholds: {
         "src/lib/**": { lines: 95, branches: 95, functions: 90, statements: 95 },
