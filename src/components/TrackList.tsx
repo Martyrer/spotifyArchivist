@@ -4,6 +4,7 @@ import type { Row } from "@/lib/ipc/types";
 import { parseArtists } from "@/lib/ipc/types";
 import { Ghost } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { TrackArt } from "./TrackArt";
 
 const ROW_HEIGHT = 56;
 
@@ -23,14 +24,14 @@ export function TrackList({ rows, isLoading }: Props) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-neutral-500">
+      <div className="flex h-full items-center justify-center text-sm text-muted">
         Loading…
       </div>
     );
   }
   if (rows.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-neutral-500">
+      <div className="flex h-full items-center justify-center text-sm text-muted">
         Nothing here yet. Run a sync.
       </div>
     );
@@ -38,7 +39,7 @@ export function TrackList({ rows, isLoading }: Props) {
 
   const items = virtualizer.getVirtualItems();
   return (
-    <div ref={parentRef} className="flex-1 overflow-y-auto">
+    <div ref={parentRef} className="h-full overflow-y-auto bg-bg">
       <div
         style={{ height: virtualizer.getTotalSize() }}
         className="relative w-full"
@@ -60,26 +61,33 @@ export function TrackList({ rows, isLoading }: Props) {
                 height: vi.size,
               }}
               className={cn(
-                "flex items-center gap-3 border-b border-neutral-900 px-6",
+                "flex items-center gap-3 border-b border-border-2 px-4 transition-colors duration-200 ease-out hover:bg-surface-2",
                 r.is_removed && "opacity-50 grayscale",
               )}
             >
-              <div className="w-8 text-xs text-neutral-500">{vi.index + 1}</div>
-              <div className="size-10 rounded bg-neutral-800" aria-hidden="true" />
+              <div className="w-8 font-mono text-[11px] tabular-nums text-faint">
+                {vi.index + 1}
+              </div>
+              <TrackArt
+                name={r.name}
+                artists={r.artists}
+                album={r.album}
+                className="size-10 shrink-0"
+              />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm">{r.name}</div>
-                <div className="truncate text-xs text-neutral-500">
+                <div className="truncate text-sm text-fg">{r.name}</div>
+                <div className="truncate text-xs text-muted">
                   {artists.map((a) => a.name).join(", ")}
                 </div>
               </div>
-              <div className="hidden w-1/3 truncate text-xs text-neutral-500 md:block">
+              <div className="hidden w-1/3 truncate text-xs text-muted md:block">
                 {r.album}
               </div>
               {r.is_removed ? (
                 <span
                   aria-label="removed by Spotify"
                   title="removed by Spotify"
-                  className="text-rose-400"
+                  className="text-muted"
                 >
                   <Ghost size={16} />
                 </span>

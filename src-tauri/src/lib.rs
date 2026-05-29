@@ -6,6 +6,7 @@ pub mod scheduler;
 pub mod spotify;
 pub mod store;
 pub mod sync;
+pub mod ui;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -13,8 +14,8 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, Listener, Manager, Runtime};
-use tauri_plugin_notification::NotificationExt;
+use tauri::async_runtime::JoinHandle;
+use tauri::{Emitter, Listener, Manager};
 
 use commands::handlers;
 use commands::AppState;
@@ -27,12 +28,12 @@ pub fn app_name() -> &'static str {
 const DEFAULT_LOGIN_TIMEOUT_SECS: u64 = 120;
 
 const CLIENT_ID_ENV: &str = "SPOTIFY_ARCHIVIST_CLIENT_ID";
-const DEFAULT_CLIENT_ID: &str = "REDACTED_CLIENT_ID";
 
 pub struct AppHandle {
     pub state: std::sync::Arc<AppState>,
     pub login: Mutex<Option<handlers::StartedLogin>>,
     pub scheduler_tx: Mutex<Option<tokio::sync::mpsc::Sender<scheduler::Tick>>>,
+    pub scheduler_join: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl AppHandle {
@@ -41,6 +42,7 @@ impl AppHandle {
             state: std::sync::Arc::new(state),
             login: Mutex::new(None),
             scheduler_tx: Mutex::new(None),
+            scheduler_join: Mutex::new(None),
         }
     }
 }
@@ -59,6 +61,14 @@ async fn toggle_source(
     enabled: bool,
 ) -> Result<(), handlers::CommandError> {
     handlers::toggle_source(&app.state, id, enabled).await
+}
+
+#[tauri::command]
+async fn untrack_source(
+    app: tauri::State<'_, AppHandle>,
+    id: i64,
+) -> Result<(), handlers::CommandError> {
+    handlers::untrack_source(&app.state, id).await
 }
 
 #[tauri::command]
@@ -96,6 +106,11 @@ async fn logout(app: tauri::State<'_, AppHandle>) -> Result<(), handlers::Comman
 }
 
 #[tauri::command]
+async fn reset_app(app: tauri::State<'_, AppHandle>) -> Result<(), handlers::CommandError> {
+    handlers::reset_app(&app.state).await
+}
+
+#[tauri::command]
 async fn list_available_playlists(
     app: tauri::State<'_, AppHandle>,
 ) -> Result<Vec<handlers::AvailablePlaylist>, handlers::CommandError> {
@@ -117,66 +132,8 @@ async fn trigger_sync(
     handle: tauri::AppHandle,
 ) -> Result<Vec<sync::SyncOutcome>, handlers::CommandError> {
     let outcomes = handlers::trigger_sync(&app.state).await?;
-    if let Some(summary) = notify::summarize(&outcomes) {
-        let new_total = app
-            .state
-            .store
-            .add_unseen_losses(summary.total_lost as u32)
-            .await
-            .map_err(handlers::CommandError::from)?;
-        let (title, body) = notify::toast_text(&summary);
-        let _ = handle
-            .notification()
-            .builder()
-            .title(title)
-            .body(body)
-            .show();
-        let _ = handle.emit("losses:updated", new_total);
-        update_tray_badge(&handle, new_total);
-    }
+    ui::dispatch_post_sync(&handle, &app.state, &outcomes).await;
     Ok(outcomes)
-}
-
-struct ToastSink<R: Runtime> {
-    handle: tauri::AppHandle<R>,
-    state: std::sync::Arc<AppState>,
-}
-
-impl<R: Runtime> scheduler::OnSyncDone for ToastSink<R> {
-    fn handle(&self, outcomes: Vec<sync::SyncOutcome>) {
-        let summary = match notify::summarize(&outcomes) {
-            Some(s) => s,
-            None => return,
-        };
-        let store = self.state.store.clone();
-        let handle = self.handle.clone();
-        let total_lost = summary.total_lost as u32;
-        let (title, body) = notify::toast_text(&summary);
-        tauri::async_runtime::spawn(async move {
-            let new_total = store
-                .add_unseen_losses(total_lost)
-                .await
-                .unwrap_or(total_lost);
-            let _ = handle
-                .notification()
-                .builder()
-                .title(title)
-                .body(body)
-                .show();
-            let _ = handle.emit("losses:updated", new_total);
-            update_tray_badge(&handle, new_total);
-        });
-    }
-}
-
-fn update_tray_badge<R: Runtime>(handle: &tauri::AppHandle<R>, unseen: u32) {
-    if let Some(tray) = handle.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(if unseen == 0 {
-            "Spotify Archivist".to_string()
-        } else {
-            format!("Spotify Archivist — {unseen} unseen loss(es)")
-        }));
-    }
 }
 
 #[tauri::command]
@@ -190,7 +147,7 @@ async fn mark_seen(
         .await
         .map_err(handlers::CommandError::from)?;
     let _ = handle.emit("losses:updated", 0u32);
-    update_tray_badge(&handle, 0);
+    ui::update_tray_badge(&handle, 0);
     Ok(())
 }
 
@@ -223,6 +180,13 @@ async fn start_login(
     let url = started.authorize_url.clone();
     *app.login.lock().expect("login mutex") = Some(started);
     Ok(StartLoginResponse { authorize_url: url })
+}
+
+#[tauri::command]
+async fn complete_onboarding(
+    app: tauri::State<'_, AppHandle>,
+) -> Result<(), handlers::CommandError> {
+    handlers::complete_onboarding(&app.state).await
 }
 
 #[tauri::command]
@@ -304,7 +268,9 @@ fn resolve_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PathBuf {
 }
 
 fn resolve_client_id() -> String {
-    std::env::var(CLIENT_ID_ENV).unwrap_or_else(|_| DEFAULT_CLIENT_ID.to_string())
+    std::env::var(CLIENT_ID_ENV).unwrap_or_else(|_| {
+        panic!("{CLIENT_ID_ENV} must be set to a Spotify application client id");
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -339,13 +305,29 @@ pub fn run() {
             let state = AppState::new(store, tokens, client_id, data_dir);
             let app_handle = AppHandle::new(state);
 
-            let sink = std::sync::Arc::new(ToastSink {
+            // If a refresh token is already in the keyring, fetch the current
+            // user once at startup so list_available_playlists / playlist
+            // ownership filters work without forcing a fresh login. Also
+            // ensure the Liked Songs source row exists — it is created on
+            // first login but a returning user with an empty store could
+            // otherwise end up with zero sources tracked.
+            let rehydrate_state = app_handle.state.clone();
+            tauri::async_runtime::block_on(async move {
+                if rehydrate_state.tokens.load().ok().flatten().is_some() {
+                    if let Ok(me) = rehydrate_state.spotify.current_user().await {
+                        *rehydrate_state.current_user_id.write().await = Some(me.id);
+                    }
+                    let _ = handlers::ensure_liked_songs_source(&rehydrate_state).await;
+                }
+            });
+
+            let sink = std::sync::Arc::new(ui::ToastSink {
                 handle: app.handle().clone(),
                 state: app_handle.state.clone(),
             });
             let sched = scheduler::spawn(app_handle.state.clone(), sink);
             *app_handle.scheduler_tx.lock().unwrap() = Some(sched.tx.clone());
-            std::mem::forget(sched);
+            *app_handle.scheduler_join.lock().unwrap() = sched.into_join_handle();
 
             app.manage(app_handle);
 
@@ -375,10 +357,12 @@ pub fn run() {
             ping,
             list_sources,
             toggle_source,
+            untrack_source,
             list_memberships,
             get_settings,
             update_settings,
             logout,
+            reset_app,
             list_available_playlists,
             track_playlist,
             trigger_sync,
@@ -388,6 +372,7 @@ pub fn run() {
             await_login,
             mark_seen,
             get_unseen_losses,
+            complete_onboarding,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -408,13 +393,7 @@ mod tests {
     }
 
     #[test]
-    fn default_client_id_used_when_env_unset() {
-        std::env::remove_var(CLIENT_ID_ENV);
-        assert_eq!(resolve_client_id(), DEFAULT_CLIENT_ID);
-    }
-
-    #[test]
-    fn env_var_overrides_client_id() {
+    fn resolve_client_id_reads_env() {
         std::env::set_var(CLIENT_ID_ENV, "abc123");
         assert_eq!(resolve_client_id(), "abc123");
         std::env::remove_var(CLIENT_ID_ENV);

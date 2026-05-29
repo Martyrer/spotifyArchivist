@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use tauri::async_runtime::JoinHandle;
 use tokio::sync::{mpsc, Notify};
-use tokio::task::JoinHandle;
 
 use crate::commands::AppState;
 use crate::sync::{SyncOutcome, Syncer};
@@ -26,6 +26,13 @@ impl SchedulerHandle {
             let _ = j.await;
         }
     }
+
+    /// Detach the join handle for parking on `AppHandle`. Replaces the
+    /// previous `mem::forget(sched)` hack — the loop still runs forever, but
+    /// the handle is owned cleanly so a future shutdown hook can `.await` it.
+    pub fn into_join_handle(mut self) -> Option<JoinHandle<()>> {
+        self.join.take()
+    }
 }
 
 pub trait OnSyncDone: Send + Sync {
@@ -38,7 +45,7 @@ pub fn spawn(state: Arc<AppState>, on_done: Arc<dyn OnSyncDone>) -> SchedulerHan
     let initial = Arc::new(Notify::new());
     let initial_clone = initial.clone();
 
-    let join = tokio::spawn(async move {
+    let join = tauri::async_runtime::spawn(async move {
         initial_clone.notify_one();
 
         let mut interval_secs = read_interval_secs(&state).await;
@@ -96,13 +103,12 @@ async fn run_once(state: &AppState, on_done: &dyn OnSyncDone) {
             return;
         }
     };
-    let mut outcomes = Vec::with_capacity(sources.len());
-    for source in sources.into_iter().filter(|s| s.enabled) {
-        match syncer.sync_source(&source).await {
-            Ok(o) => outcomes.push(o),
-            Err(e) => tracing::warn!(?e, source_id = source.id, "scheduler: sync failed"),
-        }
-    }
+    let outcomes = syncer
+        .sync_all(&sources)
+        .await
+        .into_iter()
+        .filter_map(|r| r.map_err(|e| tracing::warn!(?e, "scheduler: sync failed")).ok())
+        .collect();
     on_done.handle(outcomes);
 }
 
@@ -170,5 +176,25 @@ mod tests {
         let sink = Arc::new(CaptureSink(Mutex::new(Vec::new())));
         let handle = spawn(state, sink.clone());
         handle.shutdown().await;
+    }
+
+    /// Tauri's `setup()` callback runs on the main thread before the Tauri
+    /// async runtime is started; it is *not* inside a tokio runtime context.
+    /// `spawn()` must therefore use `tauri::async_runtime::spawn`, which
+    /// owns its own reactor, rather than bare `tokio::spawn`. This test
+    /// drives `spawn()` from a thread with no runtime to lock that in.
+    #[test]
+    fn spawn_runs_outside_a_tokio_runtime() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let state = tauri::async_runtime::block_on(fixture());
+            let sink = Arc::new(CaptureSink(Mutex::new(Vec::new())));
+            let handle = spawn(state, sink);
+            tauri::async_runtime::block_on(handle.shutdown());
+            tx.send(()).unwrap();
+        })
+        .join()
+        .unwrap();
+        rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 }

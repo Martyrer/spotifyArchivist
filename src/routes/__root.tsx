@@ -1,4 +1,5 @@
 import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { ThemeSync } from "@/components/ThemeSync";
 
 export const rootRoute = createRootRoute({
   component: RootLayout,
@@ -6,7 +7,8 @@ export const rootRoute = createRootRoute({
 
 function RootLayout() {
   return (
-    <div className="flex h-full w-full flex-col bg-neutral-950 text-neutral-100">
+    <div className="flex h-full w-full flex-col bg-bg text-fg font-sans text-[13px] leading-normal">
+      <ThemeSync />
       <Outlet />
     </div>
   );

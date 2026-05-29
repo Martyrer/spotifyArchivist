@@ -1,5 +1,4 @@
 import { Music } from "lucide-react";
-import { cn } from "@/lib/cn";
 
 type Props = {
   onClick: () => void;
@@ -10,14 +9,14 @@ type Props = {
 
 export function LoginScreen({ onClick, onCancel, isLoading, error }: Props) {
   return (
-    <main className="flex h-full flex-1 items-center justify-center">
-      <div className="flex max-w-sm flex-col items-center gap-6 text-center">
-        <div className="rounded-full bg-emerald-600/15 p-4 text-emerald-400">
-          <Music size={32} />
+    <main className="flex h-full flex-1 items-center justify-center bg-bg text-fg">
+      <div className="fc flex max-w-sm flex-col items-center gap-6 border border-border bg-surface px-8 py-10 text-center">
+        <div className="grid size-14 place-items-center bg-surface-2 text-accent">
+          <Music size={28} />
         </div>
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Spotify Archivist</h1>
-          <p className="text-sm text-neutral-400">
+          <h1 className="text-xl font-semibold tracking-tight">Spotify Archivist</h1>
+          <p className="text-sm text-muted">
             Watches your Liked Songs and playlists. Flags anything Spotify silently removes.
           </p>
         </div>
@@ -25,10 +24,8 @@ export function LoginScreen({ onClick, onCancel, isLoading, error }: Props) {
           type="button"
           disabled={isLoading}
           onClick={onClick}
-          className={cn(
-            "rounded-full bg-emerald-500 px-6 py-2 text-sm font-medium text-neutral-950",
-            "transition hover:bg-emerald-400 disabled:opacity-50",
-          )}
+          data-active={isLoading ? "true" : undefined}
+          className="pill px-6 py-2 text-sm font-medium"
         >
           {isLoading ? "Waiting for browser…" : "Login with Spotify"}
         </button>
@@ -36,12 +33,12 @@ export function LoginScreen({ onClick, onCancel, isLoading, error }: Props) {
           <button
             type="button"
             onClick={onCancel}
-            className="text-xs text-neutral-400 underline-offset-4 hover:text-neutral-200 hover:underline"
+            className="text-xs text-muted underline-offset-4 transition-colors duration-200 ease-out hover:text-fg hover:underline"
           >
             Cancel
           </button>
         ) : null}
-        {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+        {error ? <p className="font-mono text-xs text-muted">{error}</p> : null}
       </div>
     </main>
   );

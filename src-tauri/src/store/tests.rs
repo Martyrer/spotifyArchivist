@@ -175,6 +175,57 @@ async fn settings_invalid_value_errors() {
 }
 
 #[tokio::test]
+async fn delete_source_removes_row_and_memberships() {
+    let s = Store::open_in_memory().await.unwrap();
+    let id = s
+        .upsert_source(SourceKind::Playlist, Some("p"), "P")
+        .await
+        .unwrap();
+    s.upsert_track(&track("t1", "One")).await.unwrap();
+    s.upsert_membership(&membership(id, "t1", 0)).await.unwrap();
+    s.delete_source(id).await.unwrap();
+    assert!(s.list_sources().await.unwrap().is_empty());
+    assert!(s
+        .list_rows(id, MembershipFilter::All)
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn delete_source_returns_error_for_missing() {
+    let s = Store::open_in_memory().await.unwrap();
+    let err = s.delete_source(999).await.unwrap_err();
+    assert!(matches!(err, StoreError::SourceNotFound(999)));
+}
+
+#[tokio::test]
+async fn reset_wipes_data_and_restores_default_settings() {
+    let s = Store::open_in_memory().await.unwrap();
+    let id = s
+        .upsert_source(SourceKind::Playlist, Some("p"), "P")
+        .await
+        .unwrap();
+    s.upsert_track(&track("t1", "One")).await.unwrap();
+    s.upsert_membership(&membership(id, "t1", 0)).await.unwrap();
+    s.set_sync_interval_hours(20).await.unwrap();
+    s.set_onboarded(true).await.unwrap();
+    s.add_unseen_losses(5).await.unwrap();
+
+    s.reset().await.unwrap();
+
+    assert!(s.list_sources().await.unwrap().is_empty());
+    assert!(s
+        .list_rows(id, MembershipFilter::All)
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(s.sync_interval_hours().await.unwrap(), 6);
+    assert!(!s.is_onboarded().await.unwrap());
+    assert_eq!(s.unseen_losses().await.unwrap(), 0);
+}
+
+#[tokio::test]
 async fn unseen_losses_round_trip() {
     let s = Store::open_in_memory().await.unwrap();
     assert_eq!(s.unseen_losses().await.unwrap(), 0);

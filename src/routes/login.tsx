@@ -19,7 +19,7 @@ function LoginRoute() {
       await openUrl(authorize_url);
       return await ipc.await_login();
     },
-    onSuccess: () => navigate({ to: "/onboarding" }),
+    onSuccess: () => navigate({ to: "/" }),
   });
   return (
     <LoginScreen

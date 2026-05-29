@@ -78,6 +78,28 @@ impl Store {
         Ok(rows)
     }
 
+    pub async fn delete_source(&self, id: i64) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM syncs WHERE source_id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM memberships WHERE source_id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        let n = sqlx::query("DELETE FROM sources WHERE id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+        tx.commit().await?;
+        if n == 0 {
+            return Err(super::error::StoreError::SourceNotFound(id));
+        }
+        Ok(())
+    }
+
     pub async fn set_source_enabled(&self, id: i64, enabled: bool) -> Result<()> {
         let n = sqlx::query(r#"UPDATE sources SET enabled = ? WHERE id = ?"#)
             .bind(enabled)
@@ -180,43 +202,74 @@ impl Store {
         Ok(())
     }
 
-    pub async fn sync_interval_hours(&self) -> Result<u32> {
-        let v = self
-            .get_setting("sync_interval_hours")
-            .await?
-            .unwrap_or_else(|| "6".to_string());
-        let n: u32 = v
-            .parse()
+    /// Read a typed setting, returning `default` when the key is missing and
+    /// an `InvalidSetting` error when the stored string fails to parse. One
+    /// recovery policy across every kv-bag setting (was previously 3 different
+    /// ad-hoc fallbacks per accessor).
+    async fn get_typed<T: std::str::FromStr>(&self, key: &str, default: T) -> Result<T> {
+        let Some(v) = self.get_setting(key).await? else {
+            return Ok(default);
+        };
+        v.parse()
             .map_err(|_| super::error::StoreError::InvalidSetting {
-                key: "sync_interval_hours".into(),
-                value: v.clone(),
-            })?;
-        Ok(n.clamp(1, 24))
+                key: key.into(),
+                value: v,
+            })
+    }
+
+    async fn put_typed<T: std::fmt::Display>(&self, key: &str, value: T) -> Result<()> {
+        self.put_setting(key, &value.to_string()).await
+    }
+
+    pub async fn sync_interval_hours(&self) -> Result<u32> {
+        Ok(self.get_typed::<u32>("sync_interval_hours", 6).await?.clamp(1, 24))
     }
 
     pub async fn set_sync_interval_hours(&self, h: u32) -> Result<()> {
-        let h = h.clamp(1, 24);
-        self.put_setting("sync_interval_hours", &h.to_string())
-            .await
+        self.put_typed("sync_interval_hours", h.clamp(1, 24)).await
     }
 
     pub async fn unseen_losses(&self) -> Result<u32> {
-        let v = self
-            .get_setting("unseen_losses_total")
-            .await?
-            .unwrap_or_else(|| "0".to_string());
-        Ok(v.parse().unwrap_or(0))
+        self.get_typed::<u32>("unseen_losses_total", 0).await
     }
 
     pub async fn add_unseen_losses(&self, n: u32) -> Result<u32> {
-        let cur = self.unseen_losses().await?;
-        let next = cur + n;
-        self.put_setting("unseen_losses_total", &next.to_string())
-            .await?;
+        let next = self.unseen_losses().await? + n;
+        self.put_typed("unseen_losses_total", next).await?;
         Ok(next)
     }
 
     pub async fn clear_unseen_losses(&self) -> Result<()> {
-        self.put_setting("unseen_losses_total", "0").await
+        self.put_typed("unseen_losses_total", 0u32).await
+    }
+
+    pub async fn is_onboarded(&self) -> Result<bool> {
+        Ok(self.get_typed::<u32>("onboarded", 0).await? != 0)
+    }
+
+    pub async fn set_onboarded(&self, v: bool) -> Result<()> {
+        self.put_typed("onboarded", if v { 1u32 } else { 0 }).await
+    }
+
+    /// Wipe every row of user data and restore settings to first-run defaults.
+    /// Run in one transaction so a partial failure cannot leave a half-cleared db.
+    pub async fn reset(&self) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        for table in ["syncs", "memberships", "sources", "tracks"] {
+            sqlx::query(&format!("DELETE FROM {table}"))
+                .execute(&mut *tx)
+                .await?;
+        }
+        sqlx::query("DELETE FROM settings").execute(&mut *tx).await?;
+        sqlx::query(
+            r#"INSERT INTO settings (key, value) VALUES
+                ('sync_interval_hours', '6'),
+                ('consecutive_failures', '0'),
+                ('unseen_losses_total', '0')"#,
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
     }
 }

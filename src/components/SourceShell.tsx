@@ -1,11 +1,14 @@
+import { useEffect } from "react";
 import type { MembershipFilter, Row, Source } from "@/lib/ipc/types";
 import { cn } from "@/lib/cn";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart, ListMusic, RefreshCcw, Settings as SettingsIcon } from "lucide-react";
 import { ipc } from "@/lib/ipc/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { TrackList } from "./TrackList";
 import { FilterPill } from "./FilterPill";
+import { ThemeToggle } from "./ThemeToggle";
+import { PalettePopover } from "./PalettePopover";
 
 type Props = {
   sources: Source[];
@@ -26,65 +29,97 @@ export function SourceShell({
   filter,
   onFilter,
 }: Props) {
-  const qc = useQueryClient();
   const sync = useMutation({
     mutationFn: ipc.trigger_sync,
-    onSettled: () => qc.invalidateQueries({ queryKey: ["memberships", activeId] }),
   });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      // Don't hijack arrows while typing or inside a native control.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (sources.length === 0) return;
+      e.preventDefault();
+      const idx = sources.findIndex((s) => s.id === activeId);
+      const cur = idx === -1 ? 0 : idx;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      const next = (cur + step + sources.length) % sources.length;
+      const target = sources[next];
+      if (target.id !== activeId) {
+        navigate({ to: "/source/$id", params: { id: String(target.id) } });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sources, activeId, navigate]);
 
   return (
-    <div className="grid h-full w-full grid-cols-[260px_1fr]">
-      <aside className="flex h-full flex-col border-r border-neutral-800 bg-neutral-900/40">
-        <div className="px-4 py-4 text-sm font-semibold tracking-tight">Spotify Archivist</div>
-        <nav className="flex-1 overflow-y-auto px-2 pb-4">
+    <div className="grid h-screen w-screen grid-cols-[var(--sidebar-w)_1fr] overflow-hidden bg-bg text-fg">
+      <aside className="grid h-screen grid-rows-[var(--row-h)_1fr_var(--row-h)] border-r border-border bg-surface">
+        <header className="hrow flex min-h-row items-center gap-2 border-b border-border px-3">
+          <span className="grid size-6 place-items-center bg-surface-2 font-mono text-[11px]">
+            SA
+          </span>
+          <span className="font-medium">Spotify Archivist</span>
+        </header>
+        <nav className="min-h-0 overflow-y-auto p-2">
           {sources.map((s) => {
             const Icon = s.kind === "liked_songs" ? Heart : ListMusic;
+            const active = s.id === activeId;
             return (
               <Link
                 key={s.id}
                 to="/source/$id"
                 params={{ id: String(s.id) }}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
-                  s.id === activeId
-                    ? "bg-neutral-800 text-neutral-50"
-                    : "text-neutral-400 hover:bg-neutral-800/50",
+                  "flex items-center gap-2 px-2 py-1.5 text-sm transition-colors duration-200 ease-out",
+                  active
+                    ? "bg-accent-soft text-accent"
+                    : "text-muted hover:bg-surface-2 hover:text-fg",
                 )}
               >
-                <Icon size={14} />
+                <Icon size={14} className="shrink-0" />
                 <span className="truncate">{s.name}</span>
               </Link>
             );
           })}
         </nav>
-        <div className="border-t border-neutral-800 px-2 py-2">
+        <footer className="flex min-h-row items-center border-t border-border px-2">
           <Link
             to="/settings"
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-neutral-400 hover:bg-neutral-800/50"
+            className="flex flex-1 items-center gap-2 px-2 py-1.5 text-sm text-muted transition-colors duration-200 ease-out hover:bg-surface-2 hover:text-fg"
           >
             <SettingsIcon size={14} />
             <span>Settings</span>
           </Link>
-        </div>
+        </footer>
       </aside>
 
-      <main className="flex h-full flex-col">
-        <header className="flex items-center justify-between border-b border-neutral-800 px-6 py-3">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">{sourceName}</h1>
-            <p className="text-xs text-neutral-500">{rows.length} rows</p>
+      <main className="grid h-screen min-h-0 grid-rows-[var(--row-h)_1fr] overflow-hidden">
+        <header className="hrow flex min-h-row items-center gap-4 border-b border-border bg-surface px-4">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h1 className="truncate font-medium">{sourceName}</h1>
+            <span className="shrink-0 font-mono text-[11px] tabular-nums text-faint">
+              {rows.length} rows
+            </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             <FilterPill value={filter} onChange={onFilter} />
             <button
               type="button"
               onClick={() => sync.mutate()}
               disabled={sync.isPending}
-              className="flex items-center gap-1 rounded-full border border-neutral-700 px-3 py-1 text-xs hover:bg-neutral-800 disabled:opacity-50"
+              data-active={sync.isPending ? "true" : undefined}
+              className="pill flex items-center gap-1.5 px-3 py-1 text-xs"
             >
-              <RefreshCcw size={12} />
+              <RefreshCcw size={12} className={cn("ic", sync.isPending && "animate-spin")} />
               {sync.isPending ? "Syncing…" : "Sync now"}
             </button>
+            <div className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+            <ThemeToggle />
+            <PalettePopover />
           </div>
         </header>
         <TrackList rows={rows} isLoading={isLoading} />

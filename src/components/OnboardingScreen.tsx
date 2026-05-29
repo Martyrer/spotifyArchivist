@@ -20,30 +20,28 @@ export function OnboardingScreen({
   isSubmitting,
 }: Props) {
   return (
-    <main className="mx-auto flex h-full w-full max-w-2xl flex-col gap-6 px-6 py-8">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Pick what to track</h1>
-        <p className="text-sm text-neutral-400">
+    <main className="mx-auto flex h-full w-full max-w-2xl flex-col gap-6 bg-bg px-6 py-8 text-fg">
+      <header className="space-y-1">
+        <h1 className="text-lg font-semibold tracking-tight">Pick what to track</h1>
+        <p className="text-sm text-muted">
           Liked Songs is always tracked. Tick any of your own playlists you want the archivist
           to watch.
         </p>
       </header>
 
-      <section className="rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Heart size={18} className="text-emerald-400" />
-          <div>
-            <p className="text-sm font-medium">Liked Songs</p>
-            <p className="text-xs text-neutral-500">Always on, cannot be disabled here.</p>
-          </div>
+      <section className="fc flex items-center gap-3 border border-border bg-surface px-4 py-3">
+        <Heart size={18} className="text-accent" />
+        <div>
+          <p className="text-sm font-medium">Liked Songs</p>
+          <p className="text-xs text-faint">Always on, cannot be disabled here.</p>
         </div>
       </section>
 
-      <section className="flex-1 overflow-y-auto rounded-lg border border-neutral-800">
+      <section className="fc flex-1 overflow-y-auto border border-border bg-surface">
         {isLoading ? (
-          <div className="px-4 py-6 text-sm text-neutral-500">Loading playlists…</div>
+          <div className="px-4 py-6 text-sm text-muted">Loading playlists…</div>
         ) : playlists.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-neutral-500">No playlists found.</div>
+          <div className="px-4 py-6 text-sm text-muted">No playlists found.</div>
         ) : (
           <ul>
             {playlists.map((p) => {
@@ -52,8 +50,8 @@ export function OnboardingScreen({
                 <li key={p.id}>
                   <label
                     className={cn(
-                      "flex cursor-pointer items-center gap-3 border-b border-neutral-800 px-4 py-2 last:border-b-0",
-                      "hover:bg-neutral-800/40",
+                      "flex cursor-pointer items-center gap-3 border-b border-border-2 px-4 py-2 last:border-b-0",
+                      "transition-colors duration-200 ease-out hover:bg-surface-2",
                     )}
                   >
                     <input
@@ -61,12 +59,12 @@ export function OnboardingScreen({
                       checked={isPicked}
                       disabled={p.already_tracked}
                       onChange={() => onTogglePick(p.id)}
-                      className="size-4 accent-emerald-500"
+                      className="size-4 accent-[var(--accent)]"
                     />
-                    <ListMusic size={16} className="text-neutral-500" />
+                    <ListMusic size={16} className="text-muted" />
                     <span className="text-sm">{p.name}</span>
                     {p.already_tracked ? (
-                      <span className="ml-auto text-xs text-neutral-500">already tracked</span>
+                      <span className="ml-auto font-mono text-[11px] text-faint">already tracked</span>
                     ) : null}
                   </label>
                 </li>
@@ -81,7 +79,8 @@ export function OnboardingScreen({
           type="button"
           onClick={onSubmit}
           disabled={isSubmitting}
-          className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-medium text-neutral-950 transition hover:bg-emerald-400 disabled:opacity-50"
+          data-active={isSubmitting ? "true" : undefined}
+          className="pill px-5 py-2 text-sm font-medium"
         >
           {isSubmitting ? "Starting first sync…" : "Continue"}
         </button>

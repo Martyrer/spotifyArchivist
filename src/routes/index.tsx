@@ -10,6 +10,9 @@ export const indexRoute = createRoute({
     if (!settings.authenticated) {
       throw redirect({ to: "/login" });
     }
+    if (!settings.onboarded) {
+      throw redirect({ to: "/onboarding" });
+    }
     const sources = await ipc.list_sources();
     if (sources.length === 0) {
       throw redirect({ to: "/onboarding" });

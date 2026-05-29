@@ -35,7 +35,6 @@ export default defineConfig(async () => ({
         "src/main.tsx",
         "src/App.tsx",
         "src/routeTree.ts",
-        "src/routeTree.gen.ts",
         "src/routes/**",
         "src/components/SourceShell.tsx",
         "src/components/TrackList.tsx",

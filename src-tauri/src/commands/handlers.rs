@@ -44,6 +44,7 @@ pub struct Settings {
     pub sync_interval_hours: u32,
     pub authenticated: bool,
     pub user_id: Option<String>,
+    pub onboarded: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -69,6 +70,11 @@ pub async fn toggle_source(state: &AppState, id: i64, enabled: bool) -> Result<(
     Ok(())
 }
 
+pub async fn untrack_source(state: &AppState, id: i64) -> Result<()> {
+    state.store.delete_source(id).await?;
+    Ok(())
+}
+
 pub async fn list_memberships(
     state: &AppState,
     source_id: i64,
@@ -78,14 +84,24 @@ pub async fn list_memberships(
 }
 
 pub async fn get_settings(state: &AppState) -> Result<Settings> {
-    let interval = state.store.sync_interval_hours().await?;
+    let user_id_fut = async { state.current_user_id.read().await.clone() };
+    let (interval, onboarded, user_id) = tokio::try_join!(
+        async { state.store.sync_interval_hours().await.map_err(CommandError::from) },
+        async { state.store.is_onboarded().await.map_err(CommandError::from) },
+        async { Ok::<_, CommandError>(user_id_fut.await) },
+    )?;
     let token = state.tokens.load()?;
-    let user_id = state.current_user_id.read().await.clone();
     Ok(Settings {
         sync_interval_hours: interval,
         authenticated: token.is_some(),
         user_id,
+        onboarded,
     })
+}
+
+pub async fn complete_onboarding(state: &AppState) -> Result<()> {
+    state.store.set_onboarded(true).await?;
+    Ok(())
 }
 
 pub async fn update_settings(state: &AppState, sync_interval_hours: u32) -> Result<Settings> {
@@ -99,6 +115,15 @@ pub async fn update_settings(state: &AppState, sync_interval_hours: u32) -> Resu
 pub async fn logout(state: &AppState) -> Result<()> {
     state.tokens.clear()?;
     *state.current_user_id.write().await = None;
+    state.store.set_onboarded(false).await?;
+    Ok(())
+}
+
+/// Full reset: wipe all tracked data, clear credentials, and return to first-run.
+pub async fn reset_app(state: &AppState) -> Result<()> {
+    state.tokens.clear()?;
+    *state.current_user_id.write().await = None;
+    state.store.reset().await?;
     Ok(())
 }
 
@@ -147,12 +172,12 @@ pub async fn trigger_sync(state: &AppState) -> Result<Vec<crate::sync::SyncOutco
         state.clock.clone(),
     );
     let sources = state.store.list_sources().await?;
-    let mut outcomes = Vec::with_capacity(sources.len());
-    for source in sources.into_iter().filter(|s| s.enabled) {
-        let outcome = syncer.sync_source(&source).await?;
-        outcomes.push(outcome);
-    }
-    Ok(outcomes)
+    syncer
+        .sync_all(&sources)
+        .await
+        .into_iter()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(CommandError::from)
 }
 
 pub async fn export(state: &AppState, scope: ExportScope, path: PathBuf) -> Result<usize> {
@@ -289,6 +314,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn settings_default_to_not_onboarded() {
+        let state = fixture().await;
+        let s = get_settings(&state).await.unwrap();
+        assert!(!s.onboarded);
+    }
+
+    #[tokio::test]
+    async fn complete_onboarding_flips_flag() {
+        let state = fixture().await;
+        complete_onboarding(&state).await.unwrap();
+        let s = get_settings(&state).await.unwrap();
+        assert!(s.onboarded);
+    }
+
+    #[tokio::test]
+    async fn ensuring_liked_songs_does_not_imply_onboarded() {
+        let state = fixture().await;
+        ensure_liked_songs_source(&state).await.unwrap();
+        let s = get_settings(&state).await.unwrap();
+        assert!(!s.onboarded, "ensure_liked_songs must not set onboarded");
+    }
+
+    #[tokio::test]
+    async fn logout_resets_onboarded() {
+        let state = fixture().await;
+        complete_onboarding(&state).await.unwrap();
+        logout(&state).await.unwrap();
+        let s = get_settings(&state).await.unwrap();
+        assert!(!s.onboarded);
+    }
+
+    #[tokio::test]
     async fn settings_round_trip() {
         let state = fixture().await;
         let s = update_settings(&state, 4).await.unwrap();
@@ -323,6 +380,19 @@ mod tests {
         let state = fixture().await;
         let err = list_available_playlists(&state).await.unwrap_err();
         assert!(matches!(err, CommandError::NotAuthenticated));
+    }
+
+    /// Regression: after restart, tokens persist but `current_user_id` does
+    /// not. The startup rehydrate step must populate it; otherwise this
+    /// command returns NotAuthenticated even when the user is logged in.
+    #[tokio::test]
+    async fn list_available_playlists_works_after_rehydrate() {
+        let state = fixture().await;
+        *state.current_user_id.write().await = Some("u1".into());
+        // No real Spotify call possible from a unit test; the guard fires
+        // before the HTTP call. Confirm the guard now passes.
+        let result = list_available_playlists(&state).await;
+        assert!(!matches!(result, Err(CommandError::NotAuthenticated)));
     }
 
     #[tokio::test]
