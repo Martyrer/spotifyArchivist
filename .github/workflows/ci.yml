@@ -51,10 +51,10 @@ jobs:
         run: cargo fmt --check
       - name: cargo clippy
         working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
       - name: cargo test
         working-directory: src-tauri
-        run: cargo test --lib -- --test-threads=1
+        run: cargo test --locked --lib -- --test-threads=1
       - name: install cargo-llvm-cov
         if: matrix.os == 'ubuntu-latest'
         uses: taiki-e/install-action@v2
