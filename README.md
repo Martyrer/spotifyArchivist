@@ -28,14 +28,14 @@ Prerequisites: [Bun](https://bun.sh), a Rust toolchain, and the [Tauri system de
 
 1. **Create a Spotify app.** Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), create an app, and add `http://127.0.0.1:4202/callback` as a Redirect URI. Copy the **Client ID** (this is a public PKCE client — there is no client secret).
 
-2. **Provide the client id via environment variable.** The app reads it from `SPOTIFY_ARCHIVIST_CLIENT_ID` at startup and will refuse to launch if it is unset. Copy the example file and fill in your id:
+2. **Provide the client id.** The id comes from `SPOTIFY_ARCHIVIST_CLIENT_ID`. Copy the example file and fill in your id:
 
    ```sh
    cp .env.example .env
    # edit .env and set SPOTIFY_ARCHIVIST_CLIENT_ID
    ```
 
-   In development the `.env` at the project root is loaded automatically. For a release build, set the variable in the real environment instead.
+   In development the `.env` at the project root is loaded automatically.
 
 3. **Install and run.**
 
@@ -44,7 +44,19 @@ Prerequisites: [Bun](https://bun.sh), a Rust toolchain, and the [Tauri system de
    bun run tauri dev
    ```
 
-To build a release bundle, run `bun run tauri build` with the same environment variable set.
+### How the client id is resolved
+
+At startup the app resolves the id in this order:
+
+1. The `SPOTIFY_ARCHIVIST_CLIENT_ID` runtime environment variable (including the `.env` loaded in dev). This always wins, so you can override without rebuilding.
+2. A value **baked in at compile time** from the same variable in the build environment. Release builds produced by CI inject it from a repository secret, so the shipped binaries run without the user setting anything.
+3. If neither is present the app panics with a clear message.
+
+To build a release bundle locally, set the variable so it is baked in:
+
+```sh
+SPOTIFY_ARCHIVIST_CLIENT_ID=your_id bun run tauri build
+```
 
 ## Documentation
 

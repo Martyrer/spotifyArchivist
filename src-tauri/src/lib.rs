@@ -267,10 +267,23 @@ fn resolve_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PathBuf {
         .unwrap_or_else(|_| std::env::temp_dir())
 }
 
+// Baked at compile time from SPOTIFY_ARCHIVIST_CLIENT_ID if it is set in the
+// build environment (CI release builds inject it from a secret). None for a
+// plain local build, where the value comes from the runtime environment / .env.
+const BAKED_CLIENT_ID: Option<&str> = option_env!("SPOTIFY_ARCHIVIST_CLIENT_ID");
+
 fn resolve_client_id() -> String {
-    std::env::var(CLIENT_ID_ENV).unwrap_or_else(|_| {
-        panic!("{CLIENT_ID_ENV} must be set to a Spotify application client id");
-    })
+    // Runtime environment wins so developers can override via .env without a
+    // rebuild; fall back to the value baked into release binaries.
+    if let Ok(id) = std::env::var(CLIENT_ID_ENV) {
+        return id;
+    }
+    if let Some(id) = BAKED_CLIENT_ID {
+        return id.to_string();
+    }
+    panic!(
+        "{CLIENT_ID_ENV} must be set at runtime, or baked in at build time for release binaries"
+    );
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
