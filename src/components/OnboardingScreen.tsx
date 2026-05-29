@@ -40,7 +40,8 @@ export function OnboardingScreen({
         </div>
       </section>
 
-      <section className="fc flex-1 overflow-y-auto overflow-x-hidden border border-border bg-surface">
+      <section className="fc flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-surface">
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {isLoading ? (
           <div className="px-4 py-6 text-sm text-muted">Loading playlists…</div>
         ) : playlists.length === 0 ? (
@@ -75,6 +76,7 @@ export function OnboardingScreen({
             })}
           </ul>
         )}
+        </div>
       </section>
 
       <footer className="flex justify-end">

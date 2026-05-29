@@ -304,3 +304,12 @@ body {
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
 }
+
+/* Tailwind v4 drops the UA pointer cursor on interactive elements. Restore it. */
+button:not(:disabled),
+select:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+label:has(> input:not(:disabled)) {
+  cursor: pointer;
+}

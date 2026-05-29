@@ -11,10 +11,14 @@
       // before first paint so the initial frame matches the saved palette/theme.
       try {
         var s = JSON.parse(localStorage.getItem("forge-ui") || "{}").state || {};
-        document.documentElement.dataset.theme = s.theme || "dark";
+        var mode = s.mode || s.theme || "system"; // s.theme = legacy v0 key
+        var sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme =
+          mode === "system" ? (sysDark ? "dark" : "light") : mode;
         document.documentElement.dataset.palette = s.palette || "warm";
       } catch (e) {
-        document.documentElement.dataset.theme = "dark";
+        document.documentElement.dataset.theme =
+          window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         document.documentElement.dataset.palette = "warm";
       }
     </script>
