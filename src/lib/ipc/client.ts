@@ -46,6 +46,7 @@ export const ipc = {
   track_playlist: (spotifyId: string, name: string) =>
     invoke<number>("track_playlist", { spotifyId, name }),
   trigger_sync: () => call("trigger_sync", z.array(SyncOutcome)),
+  get_sync_status: () => invoke<boolean>("get_sync_status"),
   export: (scope: ExportScope, path: string) =>
     invoke<number>("export", { scope, path }),
   start_login: () => call("start_login", StartLoginResponse),

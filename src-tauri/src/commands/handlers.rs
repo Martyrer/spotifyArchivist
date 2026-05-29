@@ -283,6 +283,7 @@ mod tests {
             client_id: "CID".into(),
             current_user_id: RwLock::new(None),
             data_dir: std::env::temp_dir(),
+            sync_in_progress: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

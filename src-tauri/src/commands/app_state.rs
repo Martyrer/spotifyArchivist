@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -21,6 +22,10 @@ pub struct AppState {
     pub client_id: String,
     pub current_user_id: RwLock<Option<String>>,
     pub data_dir: PathBuf,
+    /// True while any sync (manual, tray, or scheduled) is running. Lets the UI
+    /// show an in-progress indicator even for syncs it did not itself trigger,
+    /// and reflect an already-running sync when a view first mounts.
+    pub sync_in_progress: AtomicBool,
 }
 
 impl AppState {
@@ -41,6 +46,31 @@ impl AppState {
             client_id,
             current_user_id: RwLock::new(None),
             data_dir,
+            sync_in_progress: AtomicBool::new(false),
         }
+    }
+
+    /// Mark a sync as started. Returns a guard that clears the flag on drop, so
+    /// the flag is correct even if the sync returns early or panics. Returns
+    /// `None` if a sync is already running (caller should not start a second).
+    pub fn begin_sync(&self) -> Option<SyncGuard<'_>> {
+        if self
+            .sync_in_progress
+            .swap(true, Ordering::SeqCst)
+        {
+            return None;
+        }
+        Some(SyncGuard { flag: &self.sync_in_progress })
+    }
+}
+
+/// Clears `sync_in_progress` when dropped.
+pub struct SyncGuard<'a> {
+    flag: &'a AtomicBool,
+}
+
+impl Drop for SyncGuard<'_> {
+    fn drop(&mut self) {
+        self.flag.store(false, Ordering::SeqCst);
     }
 }

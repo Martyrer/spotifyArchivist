@@ -23,16 +23,27 @@ function SourceRoute() {
     ipc.mark_seen().catch(() => undefined);
   }, [sourceId]);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Reflect a sync that is already running when this view mounts (e.g. the
+  // startup auto-sync, or navigating in mid-sync) — events only fire on edges.
+  useEffect(() => {
+    ipc.get_sync_status().then(setIsSyncing).catch(() => undefined);
+  }, []);
+
   useEffect(() => {
     const unTray = listen("sync:trigger-from-tray", () => {
       void ipc.trigger_sync();
     });
+    const unStarted = listen("sync:started", () => setIsSyncing(true));
     const unDone = listen("sync:completed", () => {
+      setIsSyncing(false);
       qc.invalidateQueries({ queryKey: ["memberships"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
     });
     return () => {
       void unTray.then((u) => u());
+      void unStarted.then((u) => u());
       void unDone.then((u) => u());
     };
   }, [qc]);
@@ -55,6 +66,7 @@ function SourceRoute() {
       sourceName={source?.name ?? "Loading…"}
       rows={rows.data ?? []}
       isLoading={rows.isLoading}
+      isSyncing={isSyncing}
       filter={filter}
       onFilter={setFilter}
     />

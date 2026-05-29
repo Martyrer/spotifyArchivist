@@ -54,6 +54,10 @@ pub struct ToastSink<R: Runtime> {
 }
 
 impl<R: Runtime> scheduler::OnSyncDone for ToastSink<R> {
+    fn on_start(&self) {
+        let _ = self.handle.emit("sync:started", ());
+    }
+
     fn handle(&self, outcomes: Vec<SyncOutcome>) {
         let handle = self.handle.clone();
         let state = self.state.clone();

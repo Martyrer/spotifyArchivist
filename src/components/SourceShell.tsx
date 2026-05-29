@@ -4,7 +4,7 @@ import { cn } from "@/lib/cn";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart, ListMusic, RefreshCcw, Settings as SettingsIcon } from "lucide-react";
 import { ipc } from "@/lib/ipc/client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { TrackList } from "./TrackList";
 import { FilterPill } from "./FilterPill";
 import { ThemeToggle } from "./ThemeToggle";
@@ -17,6 +17,7 @@ type Props = {
   sourceName: string;
   rows: Row[];
   isLoading: boolean;
+  isSyncing: boolean;
   filter: MembershipFilter;
   onFilter: (f: MembershipFilter) => void;
 };
@@ -27,12 +28,21 @@ export function SourceShell({
   sourceName,
   rows,
   isLoading,
+  isSyncing,
   filter,
   onFilter,
 }: Props) {
+  const qc = useQueryClient();
   const sync = useMutation({
     mutationFn: ipc.trigger_sync,
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["memberships"] });
+      qc.invalidateQueries({ queryKey: ["sources"] });
+    },
   });
+  // Either this window kicked off the sync (mutation pending) or another
+  // trigger (tray/scheduler) is running (global flag from the backend).
+  const syncing = isSyncing || sync.isPending;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -112,19 +122,19 @@ export function SourceShell({
             <button
               type="button"
               onClick={() => sync.mutate()}
-              disabled={sync.isPending}
-              data-active={sync.isPending ? "true" : undefined}
+              disabled={syncing}
+              data-active={syncing ? "true" : undefined}
               className="pill flex items-center gap-1.5 px-3 py-1 text-xs"
             >
-              <RefreshCcw size={12} className={cn("ic", sync.isPending && "animate-spin")} />
-              {sync.isPending ? "Syncing…" : "Sync now"}
+              <RefreshCcw size={12} className={cn("ic", syncing && "animate-spin")} />
+              {syncing ? "Syncing…" : "Sync now"}
             </button>
             <div className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
             <ThemeToggle />
             <PalettePopover />
           </div>
         </header>
-        <TrackList rows={rows} isLoading={isLoading} />
+        <TrackList rows={rows} isLoading={isLoading} isSyncing={syncing} />
       </main>
     </div>
   );

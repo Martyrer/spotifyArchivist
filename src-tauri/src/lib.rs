@@ -131,9 +131,25 @@ async fn trigger_sync(
     app: tauri::State<'_, AppHandle>,
     handle: tauri::AppHandle,
 ) -> Result<Vec<sync::SyncOutcome>, handlers::CommandError> {
+    // A sync is already running (tray/scheduler/another click) — don't start a
+    // second; the in-flight one emits sync:completed for everyone.
+    let Some(_guard) = app.state.begin_sync() else {
+        return Ok(Vec::new());
+    };
+    let _ = handle.emit("sync:started", ());
     let outcomes = handlers::trigger_sync(&app.state).await?;
     ui::dispatch_post_sync(&handle, &app.state, &outcomes).await;
     Ok(outcomes)
+}
+
+#[tauri::command]
+async fn get_sync_status(
+    app: tauri::State<'_, AppHandle>,
+) -> Result<bool, handlers::CommandError> {
+    Ok(app
+        .state
+        .sync_in_progress
+        .load(std::sync::atomic::Ordering::SeqCst))
 }
 
 #[tauri::command]
@@ -433,6 +449,7 @@ pub fn run() {
             list_available_playlists,
             track_playlist,
             trigger_sync,
+            get_sync_status,
             export,
             start_login,
             cancel_login,

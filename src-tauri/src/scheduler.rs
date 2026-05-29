@@ -36,6 +36,8 @@ impl SchedulerHandle {
 }
 
 pub trait OnSyncDone: Send + Sync {
+    /// Called when a scheduled sync begins, so the UI can show progress.
+    fn on_start(&self) {}
     fn handle(&self, outcomes: Vec<SyncOutcome>);
 }
 
@@ -91,6 +93,12 @@ async fn read_interval_secs(state: &AppState) -> u64 {
 }
 
 async fn run_once(state: &AppState, on_done: &dyn OnSyncDone) {
+    // Skip if a manual sync is already in flight; the guard clears the flag on
+    // drop (including early returns below).
+    let Some(_guard) = state.begin_sync() else {
+        return;
+    };
+    on_done.on_start();
     let syncer = Syncer::new(
         state.store.clone(),
         state.spotify.clone(),

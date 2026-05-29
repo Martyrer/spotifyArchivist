@@ -5,15 +5,17 @@ import { parseArtists } from "@/lib/ipc/types";
 import { Ghost } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { TrackArt } from "./TrackArt";
+import { DotField } from "./DotField";
 
 const ROW_HEIGHT = 56;
 
 type Props = {
   rows: Row[];
   isLoading: boolean;
+  isSyncing: boolean;
 };
 
-export function TrackList({ rows, isLoading }: Props) {
+export function TrackList({ rows, isLoading, isSyncing }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -22,6 +24,17 @@ export function TrackList({ rows, isLoading }: Props) {
     overscan: 12,
   });
 
+  if (isSyncing && rows.length === 0) {
+    return (
+      <div className="relative flex h-full items-center justify-center overflow-hidden bg-bg">
+        <DotField cell={16} />
+        <div className="relative z-10 flex flex-col items-center gap-2 text-sm text-muted">
+          <span className="font-mono text-accent">Syncing…</span>
+          <span className="text-xs text-faint">Fetching tracks from Spotify</span>
+        </div>
+      </div>
+    );
+  }
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted">
