@@ -38,7 +38,12 @@ pub async fn dispatch_post_sync<R: Runtime>(
         .await
         .unwrap_or(total_lost);
     let (title, body) = notify::toast_text(&summary);
-    let _ = handle.notification().builder().title(title).body(body).show();
+    let _ = handle
+        .notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show();
     let _ = handle.emit("losses:updated", new_total);
     update_tray_badge(handle, new_total);
 }

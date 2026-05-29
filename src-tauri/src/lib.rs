@@ -12,9 +12,9 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use tauri::async_runtime::JoinHandle;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::async_runtime::JoinHandle;
 use tauri::{Emitter, Listener, Manager};
 
 use commands::handlers;

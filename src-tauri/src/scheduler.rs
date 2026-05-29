@@ -107,7 +107,10 @@ async fn run_once(state: &AppState, on_done: &dyn OnSyncDone) {
         .sync_all(&sources)
         .await
         .into_iter()
-        .filter_map(|r| r.map_err(|e| tracing::warn!(?e, "scheduler: sync failed")).ok())
+        .filter_map(|r| {
+            r.map_err(|e| tracing::warn!(?e, "scheduler: sync failed"))
+                .ok()
+        })
         .collect();
     on_done.handle(outcomes);
 }

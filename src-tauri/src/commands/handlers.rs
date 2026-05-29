@@ -86,7 +86,13 @@ pub async fn list_memberships(
 pub async fn get_settings(state: &AppState) -> Result<Settings> {
     let user_id_fut = async { state.current_user_id.read().await.clone() };
     let (interval, onboarded, user_id) = tokio::try_join!(
-        async { state.store.sync_interval_hours().await.map_err(CommandError::from) },
+        async {
+            state
+                .store
+                .sync_interval_hours()
+                .await
+                .map_err(CommandError::from)
+        },
         async { state.store.is_onboarded().await.map_err(CommandError::from) },
         async { Ok::<_, CommandError>(user_id_fut.await) },
     )?;
