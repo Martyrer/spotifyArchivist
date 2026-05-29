@@ -1,6 +1,7 @@
 import type { AvailablePlaylist } from "@/lib/ipc/types";
 import { cn } from "@/lib/cn";
 import { Heart, ListMusic } from "lucide-react";
+import { DotField } from "./DotField";
 
 type Props = {
   playlists: AvailablePlaylist[];
@@ -20,7 +21,9 @@ export function OnboardingScreen({
   isSubmitting,
 }: Props) {
   return (
-    <main className="mx-auto flex h-full w-full max-w-2xl flex-col gap-6 bg-bg px-6 py-8 text-fg">
+    <div className="relative h-full w-full overflow-hidden bg-bg">
+      <DotField />
+      <main className="relative z-10 mx-auto flex h-full w-full max-w-2xl flex-col gap-6 px-6 py-8 text-fg">
       <header className="space-y-1">
         <h1 className="text-lg font-semibold tracking-tight">Pick what to track</h1>
         <p className="text-sm text-muted">
@@ -37,7 +40,7 @@ export function OnboardingScreen({
         </div>
       </section>
 
-      <section className="fc flex-1 overflow-y-auto border border-border bg-surface">
+      <section className="fc flex-1 overflow-y-auto overflow-x-hidden border border-border bg-surface">
         {isLoading ? (
           <div className="px-4 py-6 text-sm text-muted">Loading playlists…</div>
         ) : playlists.length === 0 ? (
@@ -59,10 +62,10 @@ export function OnboardingScreen({
                       checked={isPicked}
                       disabled={p.already_tracked}
                       onChange={() => onTogglePick(p.id)}
-                      className="size-4 accent-[var(--accent)]"
+                      className="size-4 shrink-0 accent-[var(--accent)]"
                     />
-                    <ListMusic size={16} className="text-muted" />
-                    <span className="text-sm">{p.name}</span>
+                    <ListMusic size={16} className="shrink-0 text-muted" />
+                    <span className="min-w-0 truncate text-sm">{p.name}</span>
                     {p.already_tracked ? (
                       <span className="ml-auto font-mono text-[11px] text-faint">already tracked</span>
                     ) : null}
@@ -85,6 +88,7 @@ export function OnboardingScreen({
           {isSubmitting ? "Starting first sync…" : "Continue"}
         </button>
       </footer>
-    </main>
+      </main>
+    </div>
   );
 }

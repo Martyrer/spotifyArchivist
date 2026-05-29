@@ -6,6 +6,7 @@ import { ArrowLeft, Trash2 } from "lucide-react";
 import { rootRoute } from "./__root";
 import { ipc } from "@/lib/ipc/client";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DotField } from "@/components/DotField";
 
 export const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -74,7 +75,9 @@ function SettingsRoute() {
   const current = hours ?? settings.data.sync_interval_hours;
 
   return (
-    <main className="h-screen w-full overflow-x-hidden overflow-y-auto bg-bg text-fg">
+    <div className="relative h-screen w-full overflow-hidden bg-bg text-fg">
+      <DotField />
+      <main className="relative z-10 h-full w-full overflow-x-hidden overflow-y-auto">
       <header className="hrow flex min-h-row items-center gap-3 border-b border-border bg-surface px-4">
         <Link
           to="/"
@@ -236,6 +239,7 @@ function SettingsRoute() {
           </>
         }
       />
-    </main>
+      </main>
+    </div>
   );
 }

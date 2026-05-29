@@ -9,6 +9,7 @@ import { TrackList } from "./TrackList";
 import { FilterPill } from "./FilterPill";
 import { ThemeToggle } from "./ThemeToggle";
 import { PalettePopover } from "./PalettePopover";
+import { DotField } from "./DotField";
 
 type Props = {
   sources: Source[];
@@ -57,14 +58,15 @@ export function SourceShell({
 
   return (
     <div className="grid h-screen w-screen grid-cols-[var(--sidebar-w)_1fr] overflow-hidden bg-bg text-fg">
-      <aside className="grid h-screen grid-rows-[var(--row-h)_1fr_var(--row-h)] border-r border-border bg-surface">
-        <header className="hrow flex min-h-row items-center gap-2 border-b border-border px-3">
+      <aside className="relative grid h-screen grid-rows-[var(--row-h)_1fr_var(--row-h)] overflow-hidden border-r border-border bg-surface">
+        <DotField cell={12} />
+        <header className="hrow relative z-10 flex min-h-row items-center gap-2 border-b border-border px-3">
           <span className="grid size-6 place-items-center bg-surface-2 font-mono text-[11px]">
             SA
           </span>
           <span className="font-medium">Spotify Archivist</span>
         </header>
-        <nav className="min-h-0 overflow-y-auto p-2">
+        <nav className="relative z-10 min-h-0 overflow-y-auto p-2">
           {sources.map((s) => {
             const Icon = s.kind === "liked_songs" ? Heart : ListMusic;
             const active = s.id === activeId;
@@ -86,7 +88,7 @@ export function SourceShell({
             );
           })}
         </nav>
-        <footer className="flex min-h-row items-center border-t border-border px-2">
+        <footer className="relative z-10 flex min-h-row items-center border-t border-border px-2">
           <Link
             to="/settings"
             className="flex flex-1 items-center gap-2 px-2 py-1.5 text-sm text-muted transition-colors duration-200 ease-out hover:bg-surface-2 hover:text-fg"
