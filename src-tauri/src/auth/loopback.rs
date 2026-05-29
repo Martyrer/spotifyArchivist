@@ -19,11 +19,11 @@ pub const FIXED_REDIRECT_URI: &str = "http://127.0.0.1:4202/callback";
 pub struct LoopbackListener {
     pub addr: SocketAddr,
     pub redirect_uri: String,
-    receiver: oneshot::Receiver<Outcome>,
+    receiver: oneshot::Receiver<LoopbackOutcome>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Outcome {
+pub enum LoopbackOutcome {
     Code {
         code: String,
         state: String,
@@ -56,7 +56,7 @@ impl LoopbackListener {
             redirect_uri
         };
 
-        let (tx, rx) = oneshot::channel::<Outcome>();
+        let (tx, rx) = oneshot::channel::<LoopbackOutcome>();
         let tx_holder = std::sync::Arc::new(tokio::sync::Mutex::new(Some(tx)));
 
         tokio::spawn(async move {
@@ -88,7 +88,7 @@ impl LoopbackListener {
         })
     }
 
-    pub async fn wait(self, timeout: Duration) -> Result<Outcome> {
+    pub async fn wait(self, timeout: Duration) -> Result<LoopbackOutcome> {
         match tokio::time::timeout(timeout, self.receiver).await {
             Ok(Ok(o)) => Ok(o),
             Ok(Err(_)) => Err(AuthError::Cancelled),
@@ -99,7 +99,7 @@ impl LoopbackListener {
 
 async fn handle(
     req: Request<hyper::body::Incoming>,
-    tx: std::sync::Arc<tokio::sync::Mutex<Option<oneshot::Sender<Outcome>>>>,
+    tx: std::sync::Arc<tokio::sync::Mutex<Option<oneshot::Sender<LoopbackOutcome>>>>,
 ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
     if !req.uri().path().starts_with("/callback") {
         return Ok(Response::builder()
@@ -113,23 +113,23 @@ async fn handle(
         .collect();
 
     let outcome = if let Some(err) = params.get("error") {
-        Outcome::Error {
+        LoopbackOutcome::Error {
             error: err.clone(),
             state: params.get("state").cloned(),
         }
     } else if let (Some(code), Some(state)) = (params.get("code"), params.get("state")) {
-        Outcome::Code {
+        LoopbackOutcome::Code {
             code: code.clone(),
             state: state.clone(),
         }
     } else {
-        Outcome::Error {
+        LoopbackOutcome::Error {
             error: "missing_params".into(),
             state: None,
         }
     };
 
-    let html = if matches!(outcome, Outcome::Code { .. }) {
+    let html = if matches!(outcome, LoopbackOutcome::Code { .. }) {
         SUCCESS_HTML
     } else {
         FAILURE_HTML
@@ -160,7 +160,7 @@ mod tests {
         let outcome = listener.wait(Duration::from_secs(5)).await.unwrap();
         assert_eq!(
             outcome,
-            Outcome::Code {
+            LoopbackOutcome::Code {
                 code: "ABC".into(),
                 state: "XYZ".into()
             }
@@ -175,7 +175,7 @@ mod tests {
             let _ = reqwest::get(url).await;
         });
         let outcome = listener.wait(Duration::from_secs(5)).await.unwrap();
-        assert!(matches!(outcome, Outcome::Error { .. }));
+        assert!(matches!(outcome, LoopbackOutcome::Error { .. }));
     }
 
     #[tokio::test]
@@ -187,7 +187,7 @@ mod tests {
         });
         let outcome = listener.wait(Duration::from_secs(5)).await.unwrap();
         match outcome {
-            Outcome::Error { error, .. } => assert_eq!(error, "missing_params"),
+            LoopbackOutcome::Error { error, .. } => assert_eq!(error, "missing_params"),
             _ => panic!("expected error"),
         }
     }

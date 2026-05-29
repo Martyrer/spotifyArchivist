@@ -1,9 +1,11 @@
-import { createRoute } from "@tanstack/react-router";
+import { Link, createRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { rootRoute } from "./__root";
 import { ipc } from "@/lib/ipc/client";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -13,7 +15,23 @@ export const settingsRoute = createRoute({
 
 function SettingsRoute() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const settings = useQuery({ queryKey: ["settings"], queryFn: ipc.get_settings });
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const t = e.target as HTMLElement | null;
+      // Let Esc close a native control (e.g. open <select>) before leaving.
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      // The dialog owns Esc while it's open.
+      if (confirmReset) return;
+      navigate({ to: "/" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate, confirmReset]);
   const sources = useQuery({ queryKey: ["sources"], queryFn: ipc.list_sources });
   const [hours, setHours] = useState<number | null>(null);
   const [scopeId, setScopeId] = useState<"all" | number>("all");
@@ -37,17 +55,42 @@ function SettingsRoute() {
     mutationFn: ipc.logout,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
   });
+  const untrack = useMutation({
+    mutationFn: (id: number) => ipc.untrack_source(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sources"] }),
+  });
+  const reset = useMutation({
+    mutationFn: ipc.reset_app,
+    onSuccess: async () => {
+      setConfirmReset(false);
+      await qc.invalidateQueries();
+      navigate({ to: "/" });
+    },
+  });
 
-  const current = hours ?? settings.data?.sync_interval_hours ?? 6;
+  if (!settings.isSuccess) {
+    return null;
+  }
+  const current = hours ?? settings.data.sync_interval_hours;
 
   return (
-    <main className="mx-auto flex h-full w-full max-w-2xl flex-col gap-8 px-6 py-8">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
+    <main className="h-screen w-full overflow-x-hidden overflow-y-auto bg-bg text-fg">
+      <header className="hrow flex min-h-row items-center gap-3 border-b border-border bg-surface px-4">
+        <Link
+          to="/"
+          className="pill grid size-8 place-items-center"
+          aria-label="Back"
+        >
+          <ArrowLeft size={14} />
+        </Link>
+        <h1 className="font-medium">Settings</h1>
       </header>
 
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-8">
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-neutral-300">Sync interval</h2>
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.06em] text-faint">
+          Sync interval
+        </h2>
         <div className="flex items-center gap-3">
           <input
             type="range"
@@ -55,29 +98,25 @@ function SettingsRoute() {
             max={24}
             value={current}
             onChange={(e) => setHours(Number(e.target.value))}
-            className="flex-1 accent-emerald-500"
+            onPointerUp={(e) => update.mutate(Number(e.currentTarget.value))}
+            onKeyUp={(e) => update.mutate(Number(e.currentTarget.value))}
+            className="flex-1 accent-[var(--accent)]"
           />
-          <span className="w-16 text-sm tabular-nums">{current}h</span>
-          <button
-            type="button"
-            disabled={update.isPending}
-            onClick={() => update.mutate(current)}
-            className="rounded-full bg-emerald-500 px-4 py-1 text-xs text-neutral-950 disabled:opacity-50"
-          >
-            Save
-          </button>
+          <span className="min-w-[2.5rem] text-right font-mono text-sm tabular-nums">{current}h</span>
         </div>
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-neutral-300">Export JSONL</h2>
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.06em] text-faint">
+          Export JSONL
+        </h2>
         <div className="flex items-center gap-3">
           <select
             value={scopeId}
             onChange={(e) =>
               setScopeId(e.target.value === "all" ? "all" : Number(e.target.value))
             }
-            className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1 text-sm"
+            className="rounded-control border border-border bg-surface px-3 py-1 text-sm"
           >
             <option value="all">All sources</option>
             {(sources.data ?? []).map((s) => (
@@ -90,30 +129,113 @@ function SettingsRoute() {
             type="button"
             disabled={exportRun.isPending}
             onClick={() => exportRun.mutate()}
-            className="rounded-full border border-neutral-700 px-4 py-1 text-xs disabled:opacity-50"
+            data-active={exportRun.isPending ? "true" : undefined}
+            className="pill px-4 py-1 text-xs"
           >
             {exportRun.isPending ? "Exporting…" : "Export"}
           </button>
           {exportRun.data ? (
-            <span className="text-xs text-neutral-400">{exportRun.data} rows written</span>
+            <span className="font-mono text-xs tabular-nums text-muted">
+              {exportRun.data} rows written
+            </span>
           ) : null}
         </div>
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-medium text-neutral-300">Account</h2>
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.06em] text-faint">
+          Tracked playlists
+        </h2>
+        <ul className="fc border border-border bg-surface">
+          {(sources.data ?? []).map((s) => {
+            const locked = s.kind === "liked_songs";
+            return (
+              <li
+                key={s.id}
+                className="flex items-center justify-between border-b border-border-2 px-4 py-2 last:border-b-0"
+              >
+                <span className="text-sm">{s.name}</span>
+                {locked ? (
+                  <span className="font-mono text-[11px] text-faint">always tracked</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => untrack.mutate(s.id)}
+                    disabled={untrack.isPending}
+                    aria-label={`Stop tracking ${s.name}`}
+                    className="pill grid size-7 place-items-center"
+                  >
+                    <Trash2 size={14} className="ic" />
+                  </button>
+                )}
+              </li>
+            );
+          })}
+          {(sources.data ?? []).length === 0 ? (
+            <li className="px-4 py-3 text-sm text-muted">No sources yet.</li>
+          ) : null}
+        </ul>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.06em] text-faint">
+          Account
+        </h2>
         <button
           type="button"
           disabled={logout.isPending}
           onClick={() => logout.mutate()}
-          className="rounded-full border border-rose-700 px-4 py-1 text-xs text-rose-300 disabled:opacity-50"
+          data-active={logout.isPending ? "true" : undefined}
+          className="pill px-4 py-1 text-xs"
         >
           Log out
         </button>
-        {settings.data?.user_id ? (
-          <p className="text-xs text-neutral-500">Signed in as {settings.data.user_id}</p>
+        {settings.data.user_id ? (
+          <p className="font-mono text-xs text-faint">Signed in as {settings.data.user_id}</p>
         ) : null}
       </section>
+
+      <section className="space-y-2">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.06em] text-faint">
+          Danger zone
+        </h2>
+        <div className="fc flex items-center justify-between gap-4 border border-border bg-surface px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Reset application</p>
+            <p className="text-xs text-muted">
+              Wipes every tracked song, playlist, and sync record, signs you out, and returns the
+              app to its first-run state.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirmReset(true)}
+            className="pill pill-danger shrink-0 px-4 py-1 text-xs"
+          >
+            Reset
+          </button>
+        </div>
+      </section>
+      </div>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset application?"
+        confirmLabel={reset.isPending ? "Resetting…" : "Reset everything"}
+        busy={reset.isPending}
+        danger
+        onConfirm={() => reset.mutate()}
+        onCancel={() => setConfirmReset(false)}
+        body={
+          <>
+            This permanently deletes all tracked sources, songs, and sync history from the local
+            database, clears your Spotify credentials, and resets all settings to their defaults.
+            <br />
+            <br />
+            This cannot be undone. You will need to log in and pick what to track again.
+          </>
+        }
+      />
     </main>
   );
 }

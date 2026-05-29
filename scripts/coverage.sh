@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../src-tauri"
 
 cargo llvm-cov --lib \
-  --ignore-filename-regex 'lib\.rs|auth/tokens\.rs|auth/error\.rs|spotify/error\.rs|sync/error\.rs|store/error\.rs|commands/handlers\.rs' \
+  --ignore-filename-regex 'lib\.rs|ui\.rs|auth/tokens\.rs|auth/error\.rs|spotify/error\.rs|sync/error\.rs|store/error\.rs' \
   --fail-under-lines 90 \
   --fail-under-functions 90 \
   -- --test-threads=1

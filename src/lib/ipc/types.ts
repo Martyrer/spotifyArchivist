@@ -33,6 +33,7 @@ export const Settings = z.object({
   sync_interval_hours: z.number().int(),
   authenticated: z.boolean(),
   user_id: z.string().nullable(),
+  onboarded: z.boolean(),
 });
 export type Settings = z.infer<typeof Settings>;
 

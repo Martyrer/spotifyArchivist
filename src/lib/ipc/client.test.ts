@@ -31,6 +31,7 @@ describe("ipc client", () => {
       sync_interval_hours: 6,
       authenticated: true,
       user_id: "u1",
+      onboarded: true,
     }));
     const s = await ipc.get_settings();
     expect(s.sync_interval_hours).toBe(6);
@@ -47,6 +48,7 @@ describe("ipc client", () => {
       sync_interval_hours: 4,
       authenticated: false,
       user_id: null,
+      onboarded: false,
     }));
     setInvoke(spy);
     await ipc.update_settings(4);
@@ -67,8 +69,10 @@ describe("ipc client", () => {
     const spy = vi.fn(async () => undefined);
     setInvoke(spy);
     await ipc.logout();
+    await ipc.reset_app();
     await ipc.mark_seen();
     await ipc.cancel_login();
+    expect(spy).toHaveBeenCalledWith("reset_app");
     setInvoke(async () => 7);
     expect(await ipc.get_unseen_losses()).toBe(7);
   });
@@ -110,6 +114,7 @@ describe("ipc client", () => {
       sync_interval_hours: 6,
       authenticated: true,
       user_id: "u1",
+      onboarded: true,
     }));
     expect((await ipc.await_login()).authenticated).toBe(true);
   });

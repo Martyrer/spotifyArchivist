@@ -43,6 +43,14 @@ impl Syncer {
         }
     }
 
+    pub async fn sync_all(&self, sources: &[Source]) -> Vec<Result<SyncOutcome>> {
+        let mut out = Vec::with_capacity(sources.len());
+        for source in sources.iter().filter(|s| s.enabled) {
+            out.push(self.sync_source(source).await);
+        }
+        out
+    }
+
     pub async fn sync_source(&self, source: &Source) -> Result<SyncOutcome> {
         if !source.enabled {
             return Ok(SyncOutcome {
@@ -57,16 +65,16 @@ impl Syncer {
         let fetched = self.fetch(source).await?;
         let now = self.clock.now_iso();
         let existing = current_memberships(&self.store, source.id).await?;
-        let outcome = apply_diff(source.id, fetched, &existing, &now);
+        let plan = apply_diff(source.id, fetched, &existing, &now);
 
-        commit_plan(&self.store, &outcome.plan).await?;
+        commit_plan(&self.store, &plan).await?;
 
         Ok(SyncOutcome {
             source_id: source.id,
-            newly_lost: outcome.plan.newly_lost,
-            newly_pending: outcome.plan.newly_pending,
-            cleared_pending: outcome.plan.cleared_pending,
-            total_present: outcome.seen_track_ids.len(),
+            newly_lost: plan.newly_lost,
+            newly_pending: plan.newly_pending,
+            cleared_pending: plan.cleared_pending,
+            total_present: plan.total_present,
         })
     }
 

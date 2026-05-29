@@ -21,12 +21,9 @@ function OnboardingRoute() {
   const submit = useMutation({
     mutationFn: async () => {
       const list = playlists.data ?? [];
-      for (const p of list) {
-        if (picked.has(p.id) && !p.already_tracked) {
-          await ipc.track_playlist(p.id, p.name);
-        }
-      }
-      const sources = await ipc.list_sources();
+      const toTrack = list.filter((p) => picked.has(p.id) && !p.already_tracked);
+      await Promise.all(toTrack.map((p) => ipc.track_playlist(p.id, p.name)));
+      const [sources] = await Promise.all([ipc.list_sources(), ipc.complete_onboarding()]);
       void ipc.trigger_sync();
       const liked = sources.find((s) => s.kind === "liked_songs");
       return liked?.id ?? sources[0]?.id;

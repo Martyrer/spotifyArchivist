@@ -14,12 +14,7 @@ pub struct DiffPlan {
     pub newly_lost: Vec<String>,
     pub newly_pending: Vec<String>,
     pub cleared_pending: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DiffOutcome {
-    pub plan: DiffPlan,
-    pub seen_track_ids: HashSet<String>,
+    pub total_present: usize,
 }
 
 pub fn apply_diff(
@@ -27,7 +22,7 @@ pub fn apply_diff(
     fetched: Vec<FetchedItem>,
     existing: &[Membership],
     now: &str,
-) -> DiffOutcome {
+) -> DiffPlan {
     let existing_by_track: HashMap<&str, &Membership> =
         existing.iter().map(|m| (m.track_id.as_str(), m)).collect();
 
@@ -112,10 +107,8 @@ pub fn apply_diff(
         }
     }
 
-    DiffOutcome {
-        plan,
-        seen_track_ids,
-    }
+    plan.total_present = seen_track_ids.len();
+    plan
 }
 
 fn build_track(id: &str, t: &SpotifyTrack, now: &str) -> Track {
@@ -193,12 +186,12 @@ mod tests {
             &[],
             "now",
         );
-        assert_eq!(res.plan.tracks_to_upsert.len(), 2);
-        assert_eq!(res.plan.memberships_to_upsert.len(), 2);
-        assert!(res.plan.newly_lost.is_empty());
-        assert!(res.plan.newly_pending.is_empty());
-        assert_eq!(res.plan.memberships_to_upsert[0].position, 0);
-        assert_eq!(res.plan.memberships_to_upsert[1].position, 1);
+        assert_eq!(res.tracks_to_upsert.len(), 2);
+        assert_eq!(res.memberships_to_upsert.len(), 2);
+        assert!(res.newly_lost.is_empty());
+        assert!(res.newly_pending.is_empty());
+        assert_eq!(res.memberships_to_upsert[0].position, 0);
+        assert_eq!(res.memberships_to_upsert[1].position, 1);
     }
 
     #[test]
@@ -210,19 +203,18 @@ mod tests {
             &prior,
             "now",
         );
-        assert!(res.plan.newly_lost.is_empty());
-        assert!(res.plan.newly_pending.is_empty());
-        assert!(res.plan.cleared_pending.is_empty());
+        assert!(res.newly_lost.is_empty());
+        assert!(res.newly_pending.is_empty());
+        assert!(res.cleared_pending.is_empty());
     }
 
     #[test]
     fn vanished_track_first_sync_becomes_pending_not_lost() {
         let prior = vec![member("t1", 0), member("t2", 1)];
         let res = apply_diff(1, vec![fetched("t1", "One")], &prior, "now");
-        assert_eq!(res.plan.newly_pending, vec!["t2"]);
-        assert!(res.plan.newly_lost.is_empty());
+        assert_eq!(res.newly_pending, vec!["t2"]);
+        assert!(res.newly_lost.is_empty());
         let updated_t2 = res
-            .plan
             .memberships_to_upsert
             .iter()
             .find(|m| m.track_id == "t2")
@@ -236,10 +228,9 @@ mod tests {
         let mut prior = vec![member("t1", 0), member("t2", 1)];
         prior[1].pending_vanish = true;
         let res = apply_diff(1, vec![fetched("t1", "One")], &prior, "now");
-        assert_eq!(res.plan.newly_lost, vec!["t2"]);
-        assert!(res.plan.newly_pending.is_empty());
+        assert_eq!(res.newly_lost, vec!["t2"]);
+        assert!(res.newly_pending.is_empty());
         let updated_t2 = res
-            .plan
             .memberships_to_upsert
             .iter()
             .find(|m| m.track_id == "t2")
@@ -258,11 +249,10 @@ mod tests {
             &prior,
             "now",
         );
-        assert!(res.plan.newly_lost.is_empty());
-        assert!(res.plan.newly_pending.is_empty());
-        assert_eq!(res.plan.cleared_pending, vec!["t2"]);
+        assert!(res.newly_lost.is_empty());
+        assert!(res.newly_pending.is_empty());
+        assert_eq!(res.cleared_pending, vec!["t2"]);
         let t2 = res
-            .plan
             .memberships_to_upsert
             .iter()
             .find(|m| m.track_id == "t2")
@@ -284,9 +274,8 @@ mod tests {
             },
         ];
         let res = apply_diff(1, fetched, &prior, "now");
-        assert_eq!(res.plan.newly_lost, vec!["t2"]);
+        assert_eq!(res.newly_lost, vec!["t2"]);
         let t2 = res
-            .plan
             .memberships_to_upsert
             .iter()
             .find(|m| m.track_id == "t2")
@@ -304,8 +293,8 @@ mod tests {
             &[],
             "now",
         );
-        assert!(res.plan.memberships_to_upsert.is_empty());
-        assert!(res.plan.newly_lost.is_empty());
+        assert!(res.memberships_to_upsert.is_empty());
+        assert!(res.newly_lost.is_empty());
     }
 
     #[test]
@@ -316,8 +305,8 @@ mod tests {
             &[],
             "now",
         );
-        assert_eq!(res.plan.memberships_to_upsert.len(), 1);
-        assert_eq!(res.plan.tracks_to_upsert.len(), 1);
+        assert_eq!(res.memberships_to_upsert.len(), 1);
+        assert_eq!(res.tracks_to_upsert.len(), 1);
     }
 
     #[test]
@@ -325,9 +314,9 @@ mod tests {
         let mut prior = vec![member("t1", 0)];
         prior[0].is_removed = true;
         let res = apply_diff(1, vec![], &prior, "now");
-        assert!(res.plan.newly_lost.is_empty());
-        assert!(res.plan.newly_pending.is_empty());
-        assert!(res.plan.memberships_to_upsert.is_empty());
+        assert!(res.newly_lost.is_empty());
+        assert!(res.newly_pending.is_empty());
+        assert!(res.memberships_to_upsert.is_empty());
     }
 
     #[test]
@@ -336,7 +325,6 @@ mod tests {
         prior[0].is_removed = true;
         let res = apply_diff(1, vec![fetched("t1", "One")], &prior, "now");
         let t1 = res
-            .plan
             .memberships_to_upsert
             .iter()
             .find(|m| m.track_id == "t1")
@@ -358,6 +346,6 @@ mod tests {
             &[],
             "now",
         );
-        assert!(res.plan.memberships_to_upsert.is_empty());
+        assert!(res.memberships_to_upsert.is_empty());
     }
 }

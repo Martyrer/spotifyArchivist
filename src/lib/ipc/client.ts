@@ -33,12 +33,14 @@ export const ipc = {
   list_sources: () => call("list_sources", z.array(Source)),
   toggle_source: (id: number, enabled: boolean) =>
     invoke<void>("toggle_source", { id, enabled }),
+  untrack_source: (id: number) => invoke<void>("untrack_source", { id }),
   list_memberships: (sourceId: number, filter: MembershipFilter) =>
     call("list_memberships", z.array(Row), { sourceId, filter }),
   get_settings: () => call("get_settings", Settings),
   update_settings: (syncIntervalHours: number) =>
     call("update_settings", Settings, { syncIntervalHours }),
   logout: () => invoke<void>("logout"),
+  reset_app: () => invoke<void>("reset_app"),
   list_available_playlists: () =>
     call("list_available_playlists", z.array(AvailablePlaylist)),
   track_playlist: (spotifyId: string, name: string) =>
@@ -51,4 +53,5 @@ export const ipc = {
   await_login: () => call("await_login", Settings),
   mark_seen: () => invoke<void>("mark_seen"),
   get_unseen_losses: () => invoke<number>("get_unseen_losses"),
+  complete_onboarding: () => invoke<void>("complete_onboarding"),
 };

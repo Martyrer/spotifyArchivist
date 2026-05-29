@@ -24,13 +24,16 @@ function SourceRoute() {
   }, [sourceId]);
 
   useEffect(() => {
-    const unlisten = listen("sync:trigger-from-tray", () => {
-      ipc.trigger_sync().finally(() =>
-        qc.invalidateQueries({ queryKey: ["memberships"] }),
-      );
+    const unTray = listen("sync:trigger-from-tray", () => {
+      void ipc.trigger_sync();
+    });
+    const unDone = listen("sync:completed", () => {
+      qc.invalidateQueries({ queryKey: ["memberships"] });
+      qc.invalidateQueries({ queryKey: ["sources"] });
     });
     return () => {
-      void unlisten.then((u) => u());
+      void unTray.then((u) => u());
+      void unDone.then((u) => u());
     };
   }, [qc]);
 

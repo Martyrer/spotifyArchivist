@@ -6,6 +6,18 @@
     <title>Spotify Archivist</title>
   </head>
   <body>
+    <script>
+      // Pre-paint theme guard: read persisted zustand state, set <html> attrs
+      // before first paint so the initial frame matches the saved palette/theme.
+      try {
+        var s = JSON.parse(localStorage.getItem("forge-ui") || "{}").state || {};
+        document.documentElement.dataset.theme = s.theme || "dark";
+        document.documentElement.dataset.palette = s.palette || "warm";
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+        document.documentElement.dataset.palette = "warm";
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

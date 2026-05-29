@@ -22,6 +22,34 @@ A cross-platform tray app that watches your Spotify Liked Songs and your own pla
 
 Tauri 2 + React + TypeScript + Tailwind, built with Bun and Vite+. SQLite via sqlx on the Rust side. Spotify access via `rspotify`. Full stack and rationale: [`docs/decisions.md`](docs/decisions.md).
 
+## Getting started
+
+Prerequisites: [Bun](https://bun.sh), a Rust toolchain, and the [Tauri system dependencies](https://tauri.app/start/prerequisites/) for your OS.
+
+1. **Create a Spotify app.** Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), create an app, and add `http://127.0.0.1:4202/callback` as a Redirect URI. Copy the **Client ID** (this is a public PKCE client — there is no client secret).
+
+2. **Provide the client id via environment variable.** The app reads it from `SPOTIFY_ARCHIVIST_CLIENT_ID` at startup and will refuse to launch if it is unset. Copy the example file and fill in your id:
+
+   ```sh
+   cp .env.example .env
+   # edit .env and set SPOTIFY_ARCHIVIST_CLIENT_ID
+   ```
+
+   Then export it into your shell (or use a tool like `direnv` / `dotenv`) before running:
+
+   ```sh
+   export SPOTIFY_ARCHIVIST_CLIENT_ID=your_client_id_here
+   ```
+
+3. **Install and run.**
+
+   ```sh
+   bun install
+   bun run tauri dev
+   ```
+
+To build a release bundle, run `bun run tauri build` with the same environment variable set.
+
 ## Documentation
 
 - [`CONTEXT.md`](CONTEXT.md) — domain glossary.
@@ -29,6 +57,10 @@ Tauri 2 + React + TypeScript + Tailwind, built with Bun and Vite+. SQLite via sq
 - [`docs/plan.md`](docs/plan.md) — phased implementation plan.
 - [`docs/adr/`](docs/adr/) — architecture decision records.
 
-## Status
+## Security
 
-Pre-implementation. Design and documentation complete; code not yet scaffolded.
+Spotify authentication uses OAuth 2.0 + PKCE, so there is no client secret to leak. Access and refresh tokens are stored in the OS keyring, never on disk in plaintext. To report a vulnerability, see [`SECURITY.md`](SECURITY.md).
+
+## License
+
+[MIT](LICENSE).
