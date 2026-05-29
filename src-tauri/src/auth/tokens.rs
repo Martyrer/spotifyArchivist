@@ -57,25 +57,25 @@ pub struct KeyringBackend {
 
 impl TokenBackend for KeyringBackend {
     fn save(&self, value: &str) -> Result<()> {
-        let entry = keyring::Entry::new(self.service, self.user)?;
+        let entry = keyring_core::Entry::new(self.service, self.user)?;
         entry.set_password(value)?;
         Ok(())
     }
 
     fn load(&self) -> Result<Option<String>> {
-        let entry = keyring::Entry::new(self.service, self.user)?;
+        let entry = keyring_core::Entry::new(self.service, self.user)?;
         match entry.get_password() {
             Ok(v) => Ok(Some(v)),
-            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(keyring_core::Error::NoEntry) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 
     fn clear(&self) -> Result<()> {
-        let entry = keyring::Entry::new(self.service, self.user)?;
+        let entry = keyring_core::Entry::new(self.service, self.user)?;
         match entry.delete_credential() {
             Ok(()) => Ok(()),
-            Err(keyring::Error::NoEntry) => Ok(()),
+            Err(keyring_core::Error::NoEntry) => Ok(()),
             Err(e) => Err(e.into()),
         }
     }

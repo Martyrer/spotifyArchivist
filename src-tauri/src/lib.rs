@@ -317,6 +317,10 @@ pub fn run() {
                 tauri::async_runtime::block_on(async { store::Store::open(&db_path).await })
                     .expect("open store");
 
+            // keyring 4 requires selecting a default credential store before any
+            // Entry is created. Use the platform-native store; on Linux prefer the
+            // Secret Service over kernel keyutils so tokens survive a reboot.
+            keyring::use_native_store(true).expect("initialize OS keyring store");
             let tokens = auth::TokenStore::os_keyring("dev.archivist.spotify", "tokens");
             let client_id = resolve_client_id();
             let state = AppState::new(store, tokens, client_id, data_dir);

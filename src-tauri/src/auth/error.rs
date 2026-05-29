@@ -21,8 +21,8 @@ pub enum AuthError {
     Cancelled,
 }
 
-impl From<keyring::Error> for AuthError {
-    fn from(e: keyring::Error) -> Self {
+impl From<keyring_core::Error> for AuthError {
+    fn from(e: keyring_core::Error) -> Self {
         AuthError::Keyring(e.to_string())
     }
 }

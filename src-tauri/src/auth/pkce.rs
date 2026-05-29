@@ -1,6 +1,5 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use url::Url;
@@ -25,7 +24,7 @@ pub struct PkceChallenge {
 
 pub fn build_pkce() -> PkceChallenge {
     let mut buf = [0u8; 64];
-    rand::thread_rng().fill_bytes(&mut buf);
+    rand::fill(&mut buf);
     let verifier = URL_SAFE_NO_PAD.encode(buf);
 
     let mut hasher = Sha256::new();
@@ -33,7 +32,7 @@ pub fn build_pkce() -> PkceChallenge {
     let challenge = URL_SAFE_NO_PAD.encode(hasher.finalize());
 
     let mut state_buf = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut state_buf);
+    rand::fill(&mut state_buf);
     let state = URL_SAFE_NO_PAD.encode(state_buf);
 
     PkceChallenge {

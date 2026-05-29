@@ -1,5 +1,5 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Pool, Sqlite};
+use sqlx::{AssertSqlSafe, Pool, Sqlite};
 use std::path::Path;
 use std::str::FromStr;
 
@@ -173,7 +173,7 @@ impl Store {
             MembershipFilter::Removed => " AND m.is_removed = 1",
         };
         let sql = format!("{base}{where_extra} ORDER BY m.position");
-        let rows = sqlx::query_as::<_, Row>(&sql)
+        let rows = sqlx::query_as::<_, Row>(AssertSqlSafe(sql))
             .bind(source_id)
             .fetch_all(&self.pool)
             .await?;
@@ -259,7 +259,7 @@ impl Store {
     pub async fn reset(&self) -> Result<()> {
         let mut tx = self.pool.begin().await?;
         for table in ["syncs", "memberships", "sources", "tracks"] {
-            sqlx::query(&format!("DELETE FROM {table}"))
+            sqlx::query(AssertSqlSafe(format!("DELETE FROM {table}")))
                 .execute(&mut *tx)
                 .await?;
         }
