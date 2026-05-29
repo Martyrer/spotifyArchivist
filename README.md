@@ -35,11 +35,7 @@ Prerequisites: [Bun](https://bun.sh), a Rust toolchain, and the [Tauri system de
    # edit .env and set SPOTIFY_ARCHIVIST_CLIENT_ID
    ```
 
-   Then export it into your shell (or use a tool like `direnv` / `dotenv`) before running:
-
-   ```sh
-   export SPOTIFY_ARCHIVIST_CLIENT_ID=your_client_id_here
-   ```
+   In development the `.env` at the project root is loaded automatically. For a release build, set the variable in the real environment instead.
 
 3. **Install and run.**
 
