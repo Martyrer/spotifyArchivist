@@ -222,7 +222,10 @@ impl Store {
     }
 
     pub async fn sync_interval_hours(&self) -> Result<u32> {
-        Ok(self.get_typed::<u32>("sync_interval_hours", 6).await?.clamp(1, 24))
+        Ok(self
+            .get_typed::<u32>("sync_interval_hours", 6)
+            .await?
+            .clamp(1, 24))
     }
 
     pub async fn set_sync_interval_hours(&self, h: u32) -> Result<()> {
@@ -260,7 +263,9 @@ impl Store {
                 .execute(&mut *tx)
                 .await?;
         }
-        sqlx::query("DELETE FROM settings").execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM settings")
+            .execute(&mut *tx)
+            .await?;
         sqlx::query(
             r#"INSERT INTO settings (key, value) VALUES
                 ('sync_interval_hours', '6'),

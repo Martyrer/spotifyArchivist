@@ -38,6 +38,9 @@ export default defineConfig(async () => ({
         "src/routes/**",
         "src/components/SourceShell.tsx",
         "src/components/TrackList.tsx",
+        "src/components/TrackArt.tsx",
+        "src/components/ThemeSync.tsx",
+        "src/components/ThemeToggle.tsx",
       ],
       thresholds: {
         "src/lib/**": { lines: 95, branches: 95, functions: 90, statements: 95 },
