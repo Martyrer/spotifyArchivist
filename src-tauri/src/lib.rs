@@ -338,9 +338,26 @@ pub fn run() {
 
             let db_path = data_dir.join("archivist.sqlite");
 
-            let store =
-                tauri::async_runtime::block_on(async { store::Store::open(&db_path).await })
-                    .expect("open store");
+            let store = match tauri::async_runtime::block_on(store::Store::open(&db_path)) {
+                Ok(store) => store,
+                Err(e) => {
+                    // The schema is unusable, so the app cannot function — but a
+                    // silent close leaves the user with no idea why. Surface the
+                    // reason in a native dialog, then exit cleanly.
+                    tracing::error!("failed to open store at {db_path:?}: {e}");
+                    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+                    app.dialog()
+                        .message(format!(
+                            "Could not open the local database.\n\n{e}\n\nLocation: {}",
+                            db_path.display()
+                        ))
+                        .kind(MessageDialogKind::Error)
+                        .title("Spotify Archivist failed to start")
+                        .blocking_show();
+                    app.handle().exit(1);
+                    return Ok(());
+                }
+            };
 
             // keyring 4 requires selecting a default credential store before any
             // Entry is created. Use the platform-native store; on Linux prefer the
