@@ -29,11 +29,11 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "geist": "^1.7.1",
-    "lucide-react": "^0.469.0",
+    "lucide-react": "^1.17.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tailwind-merge": "^2.5.5",
-    "zod": "^3.24.1",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
@@ -45,15 +45,15 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/coverage-v8": "^2.1.8",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.7",
     "autoprefixer": "^10.4.20",
-    "happy-dom": "^15.11.7",
-    "oxlint": "^0.15.0",
+    "happy-dom": "^20.9.0",
+    "oxlint": "^1.67.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.0.0-beta.7",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.3",
-    "vitest": "^2.1.8"
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
   }
 }
