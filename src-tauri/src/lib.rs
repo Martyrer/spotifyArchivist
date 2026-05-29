@@ -267,6 +267,25 @@ fn resolve_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PathBuf {
         .unwrap_or_else(|_| std::env::temp_dir())
 }
 
+// Append every panic to a crash file, then run the default hook so behavior is
+// otherwise unchanged. Release builds have no terminal to print to, so without
+// this a panic in startup vanishes and the window just closes.
+fn install_panic_logger(crash_log: PathBuf) {
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&crash_log)
+        {
+            let when = chrono::Utc::now().to_rfc3339();
+            let _ = writeln!(f, "[{when}] {info}");
+        }
+        default(info);
+    }));
+}
+
 // Baked at compile time from SPOTIFY_ARCHIVIST_CLIENT_ID if it is set in the
 // build environment (CI release builds inject it from a secret). None for a
 // plain local build, where the value comes from the runtime environment / .env.
@@ -311,6 +330,12 @@ pub fn run() {
         .setup(|app| {
             let data_dir = resolve_data_dir(app.handle());
             std::fs::create_dir_all(&data_dir).ok();
+
+            // Persist panics to a file. The log plugin's macros never run during
+            // a panic (it unwinds straight to abort), so a release crash leaves
+            // no trace otherwise — exactly what made the boot crash undebuggable.
+            install_panic_logger(data_dir.join("crash.log"));
+
             let db_path = data_dir.join("archivist.sqlite");
 
             let store =
@@ -320,7 +345,11 @@ pub fn run() {
             // keyring 4 requires selecting a default credential store before any
             // Entry is created. Use the platform-native store; on Linux prefer the
             // Secret Service over kernel keyutils so tokens survive a reboot.
-            keyring::use_native_store(true).expect("initialize OS keyring store");
+            // Non-fatal: a transient credential-store failure must not crash the
+            // app at boot. Token reads/writes will surface their own errors later.
+            if let Err(e) = keyring::use_native_store(true) {
+                tracing::error!("failed to initialize OS keyring store: {e}");
+            }
             let tokens = auth::TokenStore::os_keyring("dev.archivist.spotify", "tokens");
             let client_id = resolve_client_id();
             let state = AppState::new(store, tokens, client_id, data_dir);

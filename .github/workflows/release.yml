@@ -48,6 +48,7 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Baked into the binary at compile time by resolve_client_id().
@@ -58,3 +59,17 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+
+      # tauri-action only uploads the installer bundles (nsis/msi). Also publish
+      # the raw self-contained exe as a portable option. Windows only; the space
+      # in the product name is stripped so the asset has a clean filename.
+      - name: Upload portable exe
+        if: matrix.os == 'windows-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          src="src-tauri/target/release/spotify-archivist.exe"
+          dest="SpotifyArchivist-${{ github.ref_name }}-portable-x64.exe"
+          cp "$src" "$dest"
+          gh release upload "${{ github.ref_name }}" "$dest" --clobber
