@@ -1,6 +1,6 @@
 [package]
 name = "spotify-archivist"
-version = "0.4.0"
+version = "0.5.0"
 description = "Archives your Spotify Liked Songs and playlists, flags tracks Spotify silently removes."
 authors = ["you"]
 edition = "2021"

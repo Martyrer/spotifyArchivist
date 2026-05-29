@@ -54,13 +54,12 @@ impl AppState {
     /// the flag is correct even if the sync returns early or panics. Returns
     /// `None` if a sync is already running (caller should not start a second).
     pub fn begin_sync(&self) -> Option<SyncGuard<'_>> {
-        if self
-            .sync_in_progress
-            .swap(true, Ordering::SeqCst)
-        {
+        if self.sync_in_progress.swap(true, Ordering::SeqCst) {
             return None;
         }
-        Some(SyncGuard { flag: &self.sync_in_progress })
+        Some(SyncGuard {
+            flag: &self.sync_in_progress,
+        })
     }
 }
 

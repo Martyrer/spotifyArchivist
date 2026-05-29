@@ -143,9 +143,7 @@ async fn trigger_sync(
 }
 
 #[tauri::command]
-async fn get_sync_status(
-    app: tauri::State<'_, AppHandle>,
-) -> Result<bool, handlers::CommandError> {
+async fn get_sync_status(app: tauri::State<'_, AppHandle>) -> Result<bool, handlers::CommandError> {
     Ok(app
         .state
         .sync_in_progress

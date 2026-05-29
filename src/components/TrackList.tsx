@@ -1,8 +1,8 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Row } from "@/lib/ipc/types";
 import { parseArtists } from "@/lib/ipc/types";
-import { Ghost } from "lucide-react";
+import { Check, Copy, Ghost } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { TrackArt } from "./TrackArt";
 import { DotField } from "./DotField";
@@ -15,8 +15,29 @@ type Props = {
   isSyncing: boolean;
 };
 
+function copyLabel(r: Row): string {
+  const artists = parseArtists(r.artists)
+    .map((a) => a.name)
+    .join(", ");
+  return `${artists} - ${r.name}`;
+}
+
 export function TrackList({ rows, isLoading, isSyncing }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function handleCopy(r: Row): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(copyLabel(r));
+    } catch (err) {
+      console.error("copy to clipboard failed", err);
+      return;
+    }
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    setCopiedId(r.track_id);
+    resetTimer.current = setTimeout(() => setCopiedId(null), 1500);
+  }
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
@@ -96,6 +117,19 @@ export function TrackList({ rows, isLoading, isSyncing }: Props) {
               <div className="hidden w-1/3 truncate text-xs text-muted md:block">
                 {r.album}
               </div>
+              <button
+                type="button"
+                onClick={() => handleCopy(r)}
+                aria-label={`copy "${copyLabel(r)}"`}
+                title="Copy as “Artist - Song”"
+                className="shrink-0 rounded p-1.5 text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              >
+                {copiedId === r.track_id ? (
+                  <Check size={16} className="text-accent" />
+                ) : (
+                  <Copy size={16} />
+                )}
+              </button>
               {r.is_removed ? (
                 <span
                   aria-label="removed by Spotify"
