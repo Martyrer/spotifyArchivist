@@ -225,6 +225,14 @@
     max-width: 100%;
   }
 
+  .top-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 1rem;
+    overflow: hidden;
+  }
+
   .top-actions {
     display: grid;
     grid-auto-flow: column;

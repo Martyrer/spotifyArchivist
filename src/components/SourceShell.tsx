@@ -114,7 +114,7 @@ export function SourceShell({
       </aside>
 
       <main className="grid h-screen min-h-0 grid-rows-[var(--row-h)_1fr_var(--row-h)] overflow-hidden">
-        <header className="hrow grid min-h-row grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border bg-surface px-4">
+        <header className="top-header hrow min-h-row border-b border-border bg-surface px-4">
           <div className="source-title-cell flex min-w-0 items-baseline overflow-hidden">
             <h1 className="min-w-0 truncate font-medium">{sourceName}</h1>
           </div>

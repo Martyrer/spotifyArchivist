@@ -47,7 +47,7 @@ export function TrackList({ rows, isLoading, isSyncing }: Props) {
 
   if (isSyncing && rows.length === 0) {
     return (
-      <div className="relative flex h-full items-center justify-center overflow-hidden bg-bg">
+      <div className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-bg">
         <DotField cell={16} />
         <div className="relative z-10 flex flex-col items-center gap-2 text-sm text-muted">
           <span className="font-mono text-accent">Syncing…</span>
@@ -58,14 +58,14 @@ export function TrackList({ rows, isLoading, isSyncing }: Props) {
   }
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted">
+      <div className="flex h-full min-h-0 items-center justify-center text-sm text-muted">
         Loading…
       </div>
     );
   }
   if (rows.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted">
+      <div className="flex h-full min-h-0 items-center justify-center text-sm text-muted">
         Nothing here yet. Run a sync.
       </div>
     );
@@ -73,7 +73,7 @@ export function TrackList({ rows, isLoading, isSyncing }: Props) {
 
   const items = virtualizer.getVirtualItems();
   return (
-    <div ref={parentRef} className="h-full overflow-y-auto bg-bg">
+    <div ref={parentRef} className="h-full min-h-0 overflow-y-auto bg-bg">
       <div
         style={{ height: virtualizer.getTotalSize() }}
         className="relative w-full"
