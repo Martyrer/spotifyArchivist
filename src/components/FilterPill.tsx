@@ -13,7 +13,7 @@ type Props = {
 
 export function FilterPill({ value, onChange }: Props) {
   return (
-    <div role="radiogroup" className="flex items-center gap-1 text-xs">
+    <div role="radiogroup" className="filter-pill-group">
       {OPTIONS.map((o) => (
         <button
           key={o.value}
@@ -21,7 +21,7 @@ export function FilterPill({ value, onChange }: Props) {
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className="pill px-3 py-1"
+          className="pill inline-flex min-w-max shrink-0 whitespace-nowrap px-3 py-1"
         >
           {o.label}
         </button>

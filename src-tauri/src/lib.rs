@@ -281,6 +281,14 @@ fn resolve_data_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PathBuf {
         .unwrap_or_else(|_| std::env::temp_dir())
 }
 
+fn database_file_name() -> &'static str {
+    if cfg!(debug_assertions) {
+        "archivist.dev.sqlite"
+    } else {
+        "archivist.sqlite"
+    }
+}
+
 // Append every panic to a crash file, then run the default hook so behavior is
 // otherwise unchanged. Release builds have no terminal to print to, so without
 // this a panic in startup vanishes and the window just closes.
@@ -350,7 +358,7 @@ pub fn run() {
             // no trace otherwise — exactly what made the boot crash undebuggable.
             install_panic_logger(data_dir.join("crash.log"));
 
-            let db_path = data_dir.join("archivist.sqlite");
+            let db_path = data_dir.join(database_file_name());
 
             let store = match tauri::async_runtime::block_on(store::Store::open(&db_path)) {
                 Ok(store) => store,
@@ -467,6 +475,11 @@ mod tests {
     #[test]
     fn app_name_is_spotify_archivist() {
         assert_eq!(app_name(), "Spotify Archivist");
+    }
+
+    #[test]
+    fn debug_build_uses_dev_database_file() {
+        assert_eq!(database_file_name(), "archivist.dev.sqlite");
     }
 
     #[test]

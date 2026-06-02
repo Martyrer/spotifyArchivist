@@ -2,9 +2,11 @@ import { Link, createRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { rootRoute } from "./__root";
 import { ipc } from "@/lib/ipc/client";
+import { formatLastSync } from "@/lib/formatLastSync";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DotField } from "@/components/DotField";
 
@@ -36,6 +38,15 @@ function SettingsRoute() {
   const sources = useQuery({ queryKey: ["sources"], queryFn: ipc.list_sources });
   const [hours, setHours] = useState<number | null>(null);
   const [scopeId, setScopeId] = useState<"all" | number>("all");
+
+  useEffect(() => {
+    const unDone = listen("sync:completed", () => {
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    });
+    return () => {
+      void unDone.then((u) => u());
+    };
+  }, [qc]);
 
   const update = useMutation({
     mutationFn: (h: number) => ipc.update_settings(h),
@@ -73,6 +84,7 @@ function SettingsRoute() {
     return null;
   }
   const current = hours ?? settings.data.sync_interval_hours;
+  const lastSync = formatLastSync(settings.data.last_sync_at);
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-bg text-fg">
@@ -107,6 +119,9 @@ function SettingsRoute() {
           />
           <span className="min-w-[2.5rem] text-right font-mono text-sm tabular-nums">{current}h</span>
         </div>
+        <p className="font-mono text-xs tabular-nums text-faint">
+          Last sync: <span className="text-muted">{lastSync}</span>
+        </p>
       </section>
 
       <section className="space-y-2">

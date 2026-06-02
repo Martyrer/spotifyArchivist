@@ -42,6 +42,7 @@ pub type Result<T> = std::result::Result<T, CommandError>;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Settings {
     pub sync_interval_hours: u32,
+    pub last_sync_at: Option<String>,
     pub authenticated: bool,
     pub user_id: Option<String>,
     pub onboarded: bool,
@@ -85,11 +86,18 @@ pub async fn list_memberships(
 
 pub async fn get_settings(state: &AppState) -> Result<Settings> {
     let user_id_fut = async { state.current_user_id.read().await.clone() };
-    let (interval, onboarded, user_id) = tokio::try_join!(
+    let (interval, last_sync_at, onboarded, user_id) = tokio::try_join!(
         async {
             state
                 .store
                 .sync_interval_hours()
+                .await
+                .map_err(CommandError::from)
+        },
+        async {
+            state
+                .store
+                .last_successful_sync_at()
                 .await
                 .map_err(CommandError::from)
         },
@@ -99,6 +107,7 @@ pub async fn get_settings(state: &AppState) -> Result<Settings> {
     let token = state.tokens.load()?;
     Ok(Settings {
         sync_interval_hours: interval,
+        last_sync_at,
         authenticated: token.is_some(),
         user_id,
         onboarded,
@@ -357,6 +366,7 @@ mod tests {
         let state = fixture().await;
         let s = update_settings(&state, 4).await.unwrap();
         assert_eq!(s.sync_interval_hours, 4);
+        assert!(s.last_sync_at.is_none());
         assert!(!s.authenticated);
         let again = get_settings(&state).await.unwrap();
         assert_eq!(again.sync_interval_hours, 4);

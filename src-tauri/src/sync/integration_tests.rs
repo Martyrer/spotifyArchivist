@@ -92,6 +92,10 @@ async fn first_sync_writes_all_fetched_tracks() {
 
     let rows = store.list_rows(sid, MembershipFilter::All).await.unwrap();
     assert_eq!(rows.len(), 2);
+    assert_eq!(
+        store.last_successful_sync_at().await.unwrap().as_deref(),
+        Some("2026-01-01T00:00:00Z")
+    );
 }
 
 #[tokio::test]
@@ -240,4 +244,5 @@ async fn playlist_source_without_spotify_id_errors() {
         err,
         SyncError::UnsupportedSource(SourceKind::Playlist)
     ));
+    assert!(store.last_successful_sync_at().await.unwrap().is_none());
 }

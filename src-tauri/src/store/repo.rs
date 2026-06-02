@@ -232,6 +232,67 @@ impl Store {
         self.put_typed("sync_interval_hours", h.clamp(1, 24)).await
     }
 
+    pub async fn start_sync(&self, source_id: i64, started_at: &str) -> Result<i64> {
+        let row: (i64,) = sqlx::query_as(
+            r#"
+            INSERT INTO syncs (source_id, started_at, status)
+            VALUES (?, ?, 'running')
+            RETURNING id
+            "#,
+        )
+        .bind(source_id)
+        .bind(started_at)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    pub async fn finish_sync_ok(&self, id: i64, finished_at: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE syncs
+            SET finished_at = ?, status = 'ok', error = NULL
+            WHERE id = ?
+            "#,
+        )
+        .bind(finished_at)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn finish_sync_failed(&self, id: i64, finished_at: &str, error: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE syncs
+            SET finished_at = ?, status = 'failed', error = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(finished_at)
+        .bind(error)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn last_successful_sync_at(&self) -> Result<Option<String>> {
+        let row: Option<(String,)> = sqlx::query_as(
+            r#"
+            SELECT finished_at
+            FROM syncs
+            WHERE status = 'ok' AND finished_at IS NOT NULL
+            ORDER BY finished_at DESC
+            LIMIT 1
+            "#,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|x| x.0))
+    }
+
     pub async fn unseen_losses(&self) -> Result<u32> {
         self.get_typed::<u32>("unseen_losses_total", 0).await
     }

@@ -29,6 +29,7 @@ describe("ipc client", () => {
   it("parses settings shape", async () => {
     setInvoke(async () => ({
       sync_interval_hours: 6,
+      last_sync_at: "2026-01-01T00:00:00Z",
       authenticated: true,
       user_id: "u1",
       onboarded: true,
@@ -46,6 +47,7 @@ describe("ipc client", () => {
   it("update_settings sends camelCase arg key", async () => {
     const spy = vi.fn(async () => ({
       sync_interval_hours: 4,
+      last_sync_at: null,
       authenticated: false,
       user_id: null,
       onboarded: false,
@@ -112,6 +114,7 @@ describe("ipc client", () => {
     expect((await ipc.start_login()).authorize_url).toContain("accounts.spotify.com");
     setInvoke(async () => ({
       sync_interval_hours: 6,
+      last_sync_at: null,
       authenticated: true,
       user_id: "u1",
       onboarded: true,

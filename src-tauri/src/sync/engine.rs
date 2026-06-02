@@ -61,11 +61,36 @@ impl Syncer {
                 total_present: 0,
             });
         }
+        if source.kind == SourceKind::Playlist
+            && (source.spotify_id.is_empty() || source.spotify_id == "__self__")
+        {
+            return Err(SyncError::UnsupportedSource(source.kind));
+        }
 
+        let started_at = self.clock.now_iso();
+        let sync_id = self.store.start_sync(source.id, &started_at).await?;
+        let result = self.sync_source_inner(source, &started_at).await;
+        let finished_at = self.clock.now_iso();
+
+        match result {
+            Ok(outcome) => {
+                self.store.finish_sync_ok(sync_id, &finished_at).await?;
+                Ok(outcome)
+            }
+            Err(err) => {
+                let _ = self
+                    .store
+                    .finish_sync_failed(sync_id, &finished_at, &err.to_string())
+                    .await;
+                Err(err)
+            }
+        }
+    }
+
+    async fn sync_source_inner(&self, source: &Source, now: &str) -> Result<SyncOutcome> {
         let fetched = self.fetch(source).await?;
-        let now = self.clock.now_iso();
         let existing = current_memberships(&self.store, source.id).await?;
-        let plan = apply_diff(source.id, fetched, &existing, &now);
+        let plan = apply_diff(source.id, fetched, &existing, now);
 
         commit_plan(&self.store, &plan).await?;
 

@@ -40,6 +40,7 @@ function SourceRoute() {
       setIsSyncing(false);
       qc.invalidateQueries({ queryKey: ["memberships"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["settings"] });
     });
     return () => {
       void unTray.then((u) => u());

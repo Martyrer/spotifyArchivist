@@ -165,6 +165,32 @@ async fn settings_round_trip_and_clamp() {
 }
 
 #[tokio::test]
+async fn last_successful_sync_at_returns_latest_ok_finish() {
+    let s = Store::open_in_memory().await.unwrap();
+    let id = s
+        .upsert_source(SourceKind::Playlist, Some("p"), "P")
+        .await
+        .unwrap();
+    let failed = s.start_sync(id, "2026-01-01T00:00:00Z").await.unwrap();
+    s.finish_sync_failed(failed, "2026-01-01T00:01:00Z", "network")
+        .await
+        .unwrap();
+    let first = s.start_sync(id, "2026-01-02T00:00:00Z").await.unwrap();
+    s.finish_sync_ok(first, "2026-01-02T00:01:00Z")
+        .await
+        .unwrap();
+    let second = s.start_sync(id, "2026-01-03T00:00:00Z").await.unwrap();
+    s.finish_sync_ok(second, "2026-01-03T00:01:00Z")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        s.last_successful_sync_at().await.unwrap().as_deref(),
+        Some("2026-01-03T00:01:00Z")
+    );
+}
+
+#[tokio::test]
 async fn settings_invalid_value_errors() {
     let s = Store::open_in_memory().await.unwrap();
     s.put_setting("sync_interval_hours", "not-a-number")

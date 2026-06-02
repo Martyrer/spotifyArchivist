@@ -31,6 +31,7 @@ export type MembershipFilter = z.infer<typeof MembershipFilter>;
 
 export const Settings = z.object({
   sync_interval_hours: z.number().int(),
+  last_sync_at: z.string().nullable(),
   authenticated: z.boolean(),
   user_id: z.string().nullable(),
   onboarded: z.boolean(),
