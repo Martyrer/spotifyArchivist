@@ -68,7 +68,7 @@ jobs:
         run: cargo test --locked --lib -- --test-threads=1
       - name: install cargo-llvm-cov
         if: matrix.os == 'ubuntu-latest'
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.3
         with:
           tool: cargo-llvm-cov
       - name: coverage gate
