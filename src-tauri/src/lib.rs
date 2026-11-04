@@ -381,12 +381,13 @@ pub fn run() {
                 }
             };
 
-            // keyring 4 requires selecting a default credential store before any
-            // Entry is created. Use the platform-native store; on Linux prefer the
-            // Secret Service over kernel keyutils so tokens survive a reboot.
+            // keyring-core requires a default credential store before any Entry is
+            // created. keyring's `v1` feature selects the platform-native store
+            // (Keychain / Credential Manager / Secret Service, so tokens survive a
+            // reboot on Linux) on first call to `store_status`.
             // Non-fatal: a transient credential-store failure must not crash the
             // app at boot. Token reads/writes will surface their own errors later.
-            if let Err(e) = keyring::use_native_store(true) {
+            if let Err(e) = keyring::Entry::store_status() {
                 tracing::error!("failed to initialize OS keyring store: {e}");
             }
             let tokens = auth::TokenStore::os_keyring("dev.archivist.spotify", "tokens");
